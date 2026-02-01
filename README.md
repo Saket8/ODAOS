@@ -6,6 +6,8 @@
 
 An intelligent, multi-agent AI system for Oracle Database operations, built with LangGraph and powered by Groq LLM.
 
+> **Project Status: MVP In Progress** — Core agents operational, live database and OCI integrations complete.
+
 ## 🚀 Features
 
 ### Three Specialized AI Agents
@@ -25,7 +27,8 @@ An intelligent, multi-agent AI system for Oracle Database operations, built with
 ### MCP Server Architecture
 - Model Context Protocol (MCP) compliant
 - 12 specialized tools across 3 servers
-- Mock data for testing without live database
+- Live database integration via secure tunneling
+- Live OCI API integration for cost analysis
 
 ## 📦 Installation
 
@@ -290,16 +293,19 @@ ODAOS: 📊 **Database Performance Summary**
 - [x] Three specialized agents
 - [x] Multi-agent orchestrator
 - [x] CLI interface
-- [ ] Live database integration
+- [x] Live database integration (secure tunneling)
+- [x] Live OCI cost API integration
+- [x] Web dashboard (read-only analysis)
+- [ ] Integration testing
+- [ ] User acceptance testing
 
-### Phase 2 - Production
+### Phase 2 - Production (Planned)
 - [ ] Docker containerization
 - [ ] Kubernetes deployment
 - [ ] OCI deployment automation
 - [ ] REST API with FastAPI
-- [ ] Streamlit dashboard
 
-### Phase 3 - Advanced
+### Phase 3 - Advanced (Planned)
 - [ ] ML-based anomaly detection
 - [ ] Predictive maintenance
 - [ ] Auto-remediation workflows
