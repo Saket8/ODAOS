@@ -290,59 +290,71 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 
 async def get_database_metrics_handler() -> dict:
-    """Get database performance metrics.
-    
-    Queries v$sysmetric, v$session, and related views for current metrics.
-    Falls back to mock data if database is not connected.
-    """
+    """Get database performance metrics from live database."""
     try:
-        from src.database.connection import get_connection_manager
+        from src.database.live_queries import LiveDBQueries
         
-        manager = get_connection_manager()
-        
-        # Check if we have database credentials configured
-        if not manager.dsn or not manager.user:
-            logger.info("Database not configured, using mock data")
-            return get_mock_database_metrics()
-        
-        # Real database queries would go here
-        # For now, use mock data
-        logger.info("Using mock database metrics")
-        return get_mock_database_metrics()
-        
+        with LiveDBQueries() as db:
+            info = db.get_database_info()
+            metrics = db.get_performance_metrics()
+            
+            return {
+                "timestamp": metrics["timestamp"],
+                "database": info["database"]["NAME"],
+                "pdb": info["database"]["PDB"],
+                "cpu": {
+                    "host_cpu_utilization": 0,  # Not available without special grants
+                    "db_cpu_percentage": 0,
+                },
+                "memory": {
+                    "sga_total_mb": metrics["sga"].get("Total SGA Size", 0),
+                    "buffer_cache_mb": metrics["sga"].get("Buffer Cache Size", 0),
+                    "shared_pool_mb": metrics["sga"].get("Shared Pool Size", 0),
+                    "pga_mb": metrics["pga_mb"],
+                },
+                "sessions": {
+                    "active_sessions": metrics["sessions"]["ACTIVE"] or 0,
+                    "total_sessions": metrics["sessions"]["TOTAL"] or 0,
+                    "inactive_sessions": metrics["sessions"]["INACTIVE"] or 0,
+                },
+                "top_wait_events": [
+                    {"event": w["EVENT"], "time_secs": w["TIME_SECS"], "wait_class": w["WAIT_CLASS"]}
+                    for w in metrics["wait_events"][:5]
+                ],
+                "system_stats": metrics["system_stats"],
+            }
     except Exception as e:
-        logger.warning(f"Database connection failed, using mock data: {e}")
+        logger.warning(f"Live database failed, using mock: {e}")
         return get_mock_database_metrics()
 
 
 async def analyze_top_sql_handler(top_n: int = 10, order_by: str = "elapsed_time") -> dict:
-    """Analyze top SQL statements.
-    
-    Queries v$sql for the most resource-intensive SQL statements.
-    Falls back to mock data if database is not connected.
-    """
+    """Analyze top SQL statements from live database."""
     try:
-        from src.database.connection import get_connection_manager
+        from src.database.live_queries import LiveDBQueries
         
-        manager = get_connection_manager()
-        
-        if not manager.dsn or not manager.user:
-            logger.info("Database not configured, using mock data")
+        with LiveDBQueries() as db:
+            top_sql = db.get_top_sql(top_n, order_by)
+            
             return {
                 "timestamp": datetime.now().isoformat(),
                 "parameters": {"top_n": top_n, "order_by": order_by},
-                "sql_statements": get_mock_top_sql(top_n, order_by),
+                "sql_statements": [
+                    {
+                        "sql_id": s["SQL_ID"],
+                        "sql_text": s.get("SQL_PREVIEW", ""),
+                        "elapsed_time_secs": s["ELAPSED_SECS"],
+                        "cpu_time_secs": s["CPU_SECS"],
+                        "executions": s["EXECUTIONS"],
+                        "buffer_gets": s["BUFFER_GETS"],
+                        "disk_reads": s["DISK_READS"],
+                        "gets_per_exec": s["GETS_PER_EXEC"] or 0,
+                    }
+                    for s in top_sql
+                ],
             }
-        
-        logger.info("Using mock SQL analysis")
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "parameters": {"top_n": top_n, "order_by": order_by},
-            "sql_statements": get_mock_top_sql(top_n, order_by),
-        }
-        
     except Exception as e:
-        logger.warning(f"Database connection failed, using mock data: {e}")
+        logger.warning(f"Live database failed, using mock: {e}")
         return {
             "timestamp": datetime.now().isoformat(),
             "parameters": {"top_n": top_n, "order_by": order_by},
@@ -351,25 +363,15 @@ async def analyze_top_sql_handler(top_n: int = 10, order_by: str = "elapsed_time
 
 
 async def check_tablespace_usage_handler(threshold: int = 85) -> dict:
-    """Check tablespace usage against threshold.
-    
-    Queries dba_tablespace_usage_metrics for tablespace information.
-    Falls back to mock data if database is not connected.
-    """
+    """Check tablespace usage from live database."""
     try:
-        from src.database.connection import get_connection_manager
+        from src.database.live_queries import LiveDBQueries
         
-        manager = get_connection_manager()
-        
-        if not manager.dsn or not manager.user:
-            logger.info("Database not configured, using mock data")
-            return get_mock_tablespace_usage(threshold)
-        
-        logger.info("Using mock tablespace data")
-        return get_mock_tablespace_usage(threshold)
-        
+        with LiveDBQueries() as db:
+            return db.get_tablespace_usage(threshold)
+            
     except Exception as e:
-        logger.warning(f"Database connection failed, using mock data: {e}")
+        logger.warning(f"Live database failed, using mock: {e}")
         return get_mock_tablespace_usage(threshold)
 
 

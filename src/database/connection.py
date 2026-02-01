@@ -60,8 +60,13 @@ class OracleConnectionManager:
                 "Set ORACLE_DSN, ORACLE_USER, ORACLE_PASSWORD in .env file."
             )
         
-        # Using thin mode - no Oracle Instant Client needed
-        # For thick mode, uncomment: oracledb.init_oracle_client()
+        # Enable thick mode for Native Network Encryption (NNE) support
+        # Required when database has SQLNET.ENCRYPTION_SERVER = required
+        try:
+            oracledb.init_oracle_client(lib_dir=r"C:\oracle\instantclient_21_20")
+        except oracledb.ProgrammingError:
+            # Already initialized - ignore
+            pass
         
         self._pool = oracledb.create_pool_async(
             user=self.user,

@@ -472,50 +472,73 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 
 async def monitor_alert_log_handler(hours: int = 24) -> dict:
-    """Monitor alert log for errors."""
-    try:
-        from src.database.connection import get_connection_manager
-        manager = get_connection_manager()
-        
-        if not manager.dsn or not manager.user:
-            logger.info("Database not configured, using mock data")
-            return get_mock_alert_log_errors(hours)
-        
-        return get_mock_alert_log_errors(hours)
-    except Exception as e:
-        logger.warning(f"Database connection failed, using mock data: {e}")
-        return get_mock_alert_log_errors(hours)
+    """Monitor alert log for errors - uses mock data as alert log requires special access."""
+    # Alert log access requires V_$DIAG_ALERT_EXT which may not be granted
+    # Keep mock data for this handler
+    return get_mock_alert_log_errors(hours)
 
 
 async def check_blocking_sessions_handler() -> dict:
-    """Check for blocking sessions."""
+    """Check for blocking sessions from live database."""
     try:
-        from src.database.connection import get_connection_manager
-        manager = get_connection_manager()
+        from src.database.live_queries import LiveDBQueries
         
-        if not manager.dsn or not manager.user:
-            logger.info("Database not configured, using mock data")
-            return get_mock_blocking_sessions()
-        
-        return get_mock_blocking_sessions()
+        with LiveDBQueries() as db:
+            blocking = db.get_blocking_sessions()
+            
+            # Format for agent consumption
+            blockers = []
+            for b in blocking.get("blockers", []):
+                blockers.append({
+                    "blocker_sid": b["SID"],
+                    "blocker_serial": b["SERIAL#"],
+                    "blocker_username": b.get("USERNAME"),
+                    "blocker_machine": b.get("MACHINE"),
+                    "blocker_program": b.get("PROGRAM"),
+                    "blocker_sql_id": b.get("SQL_ID"),
+                    "blocked_session_count": b.get("VICTIMS", 0),
+                    "risk_level": "HIGH" if b.get("VICTIMS", 0) > 2 else "MEDIUM",
+                })
+            
+            return {
+                "timestamp": blocking["timestamp"],
+                "summary": {
+                    "blocking_sessions": blocking["blocker_count"],
+                    "total_blocked_sessions": blocking["blocked_count"],
+                },
+                "blockers": blockers,
+            }
     except Exception as e:
-        logger.warning(f"Database connection failed, using mock data: {e}")
+        logger.warning(f"Live database failed, using mock: {e}")
         return get_mock_blocking_sessions()
 
 
 async def get_tablespace_status_handler() -> dict:
-    """Get tablespace status for self-healing."""
+    """Get tablespace status from live database."""
     try:
-        from src.database.connection import get_connection_manager
-        manager = get_connection_manager()
+        from src.database.live_queries import LiveDBQueries
         
-        if not manager.dsn or not manager.user:
-            logger.info("Database not configured, using mock data")
-            return get_mock_tablespace_status()
-        
-        return get_mock_tablespace_status()
+        with LiveDBQueries() as db:
+            ts_data = db.get_tablespace_usage()
+            
+            # Format for self-healing analysis
+            tablespaces = []
+            for alert in ts_data.get("alerts", []) + ts_data.get("healthy", []):
+                tablespaces.append({
+                    "name": alert["name"],
+                    "used_mb": alert["used_mb"],
+                    "total_mb": alert["total_mb"],
+                    "used_pct": alert["used_pct"],
+                    "criticality": alert.get("severity", "OK"),
+                })
+            
+            return {
+                "timestamp": ts_data["timestamp"],
+                "summary": ts_data["summary"],
+                "tablespaces": sorted(tablespaces, key=lambda x: x["used_pct"], reverse=True),
+            }
     except Exception as e:
-        logger.warning(f"Database connection failed, using mock data: {e}")
+        logger.warning(f"Live database failed, using mock: {e}")
         return get_mock_tablespace_status()
 
 

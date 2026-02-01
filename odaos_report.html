@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ODAOS Report - DB0703</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        h1 {
+            font-size: 2rem;
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .timestamp { color: #888; }
+        .score-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .score-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ff4444, #cc0022);
+        }
+        .score-value { font-size: 1.8rem; color: #000; }
+        .score-grade { font-size: 0.8rem; color: rgba(0,0,0,0.6); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card h2 {
+            font-size: 0.9rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1rem;
+        }
+        .metric { font-size: 2.5rem; font-weight: 700; color: #00d9ff; }
+        .metric-label { color: #888; font-size: 0.875rem; margin-top: 0.25rem; }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .info-label { color: #888; }
+        .progress-row {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0;
+        }
+        .progress-name { width: 120px; }
+        .progress-bar {
+            flex-grow: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin: 0 1rem;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00d9ff);
+        }
+        .progress-fill.warning { background: linear-gradient(90deg, #ffaa00, #ff8800); }
+        .progress-fill.critical { background: linear-gradient(90deg, #ff4444, #cc0022); }
+        .progress-value { width: 150px; text-align: right; color: #888; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        th { color: #888; font-weight: 500; font-size: 0.8rem; text-transform: uppercase; }
+        .sql-id { color: #00d9ff; font-family: monospace; }
+        .sql-preview { font-family: monospace; font-size: 0.75rem; color: #888; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .full-width { grid-column: 1 / -1; }
+        .badge { 
+            display: inline-block; 
+            padding: 0.25rem 0.75rem; 
+            border-radius: 4px; 
+            font-size: 0.75rem; 
+            font-weight: 600; 
+        }
+        .badge-ok { background: rgba(0,255,136,0.2); color: #00ff88; }
+        .badge-warn { background: rgba(255,170,0,0.2); color: #ffaa00; }
+        .badge-crit { background: rgba(255,68,68,0.2); color: #ff4444; }
+        .issues { margin-top: 1rem; }
+        .issue { padding: 0.5rem 1rem; background: rgba(255,170,0,0.1); border-left: 3px solid #ffaa00; margin-bottom: 0.5rem; border-radius: 4px; }
+        .issue.critical { background: rgba(255,68,68,0.1); border-color: #ff4444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🔮 ODAOS Database Report</h1>
+                <div class="timestamp">Generated: 2026-02-01 16:37:07</div>
+            </div>
+            <div class="score-container">
+                <div class="score-circle">
+                    <span class="score-value">50</span>
+                    <span class="score-grade">Grade D</span>
+                </div>
+                <div>
+                    <div style="font-size: 1.2rem; font-weight: 600;">Database Health</div>
+                    <div style="color: #888;">DB0703 / BRMPDB</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Metrics -->
+        <div class="grid" style="margin-bottom: 1.5rem;">
+            <div class="card">
+                <h2>👥 Sessions</h2>
+                <div class="metric">1</div>
+                <div class="metric-label">Active / 2 Total</div>
+            </div>
+            <div class="card">
+                <h2>⏱️ Uptime</h2>
+                <div class="metric">3h</div>
+                <div class="metric-label">Since 2026-02-01 07:30:38</div>
+            </div>
+            <div class="card">
+                <h2>🔒 Blocking</h2>
+                <div class="metric" style="color: #00ff88;">0</div>
+                <div class="metric-label">✓ No blocks</div>
+            </div>
+        </div>
+        
+        <!-- Database Info & Issues -->
+        <div class="grid" style="margin-bottom: 1.5rem;">
+            <div class="card">
+                <h2>🗄️ Database Information</h2>
+                <div class="info-row"><span class="info-label">Database</span><span>DB0703</span></div>
+                <div class="info-row"><span class="info-label">Container</span><span>BRMPDB</span></div>
+                <div class="info-row"><span class="info-label">Version</span><span>Oracle Database 19c EE High Perf Release 19.0.0.0.0</span></div>
+                <div class="info-row"><span class="info-label">Open Mode</span><span>READ WRITE</span></div>
+                <div class="info-row"><span class="info-label">Role</span><span class="badge badge-ok">PRIMARY</span></div>
+                <div class="info-row"><span class="info-label">Host</span><span>brmdb</span></div>
+            </div>
+            <div class="card">
+                <h2>💾 SGA Memory</h2>
+                <div class="info-row"><span class="info-label">Fixed SGA Size</span><span>9 MB</span></div><div class="info-row"><span class="info-label">Redo Buffers</span><span>135 MB</span></div><div class="info-row"><span class="info-label">Buffer Cache Size</span><span>5,376 MB</span></div><div class="info-row"><span class="info-label">Shared Pool Size</span><span>1,120 MB</span></div><div class="info-row"><span class="info-label">Large Pool Size</span><span>16 MB</span></div>
+            </div>
+        </div>
+        
+        <!-- Issues if any -->
+        <div class="card full-width" style="margin-bottom: 1.5rem;">
+            <h2>⚠️ Issues Detected</h2>
+            <div class="issues">
+                <div class="issue critical">CRITICAL: SYSTEM at 99.8%</div><div class="issue critical">CRITICAL: ECE_DATA at 95%</div><div class="issue ">WARNING: SYSAUX at 93.9%</div>
+            </div>
+        </div>
+        
+        <!-- Tablespaces -->
+        <div class="card full-width" style="margin-bottom: 1.5rem;">
+            <h2>📊 Tablespace Usage</h2>
+            <div class="progress-row">
+                <span class="progress-name">SYSTEM</span>
+                <div class="progress-bar">
+                    <div class="progress-fill critical" style="width: 99.8%"></div>
+                </div>
+                <span class="progress-value">99.8% (549 / 550 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">ECE_DATA</span>
+                <div class="progress-bar">
+                    <div class="progress-fill critical" style="width: 95%"></div>
+                </div>
+                <span class="progress-value">95% (15,318 / 16,124 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">SYSAUX</span>
+                <div class="progress-bar">
+                    <div class="progress-fill critical" style="width: 93.9%"></div>
+                </div>
+                <span class="progress-value">93.9% (657 / 700 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">PIN00</span>
+                <div class="progress-bar">
+                    <div class="progress-fill " style="width: 79.9%"></div>
+                </div>
+                <span class="progress-value">79.9% (559 / 700 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">PINX00</span>
+                <div class="progress-bar">
+                    <div class="progress-fill " style="width: 38.8%"></div>
+                </div>
+                <span class="progress-value">38.8% (398 / 1,024 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">PDC_DATA</span>
+                <div class="progress-bar">
+                    <div class="progress-fill " style="width: 38.3%"></div>
+                </div>
+                <span class="progress-value">38.3% (392 / 1,024 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">USERS</span>
+                <div class="progress-bar">
+                    <div class="progress-fill " style="width: 20%"></div>
+                </div>
+                <span class="progress-value">20% (1 / 5 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">ECECDR_DATA</span>
+                <div class="progress-bar">
+                    <div class="progress-fill " style="width: 0.9%"></div>
+                </div>
+                <span class="progress-value">0.9% (9 / 1,024 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">PIN_DATA</span>
+                <div class="progress-bar">
+                    <div class="progress-fill " style="width: 0.3%"></div>
+                </div>
+                <span class="progress-value">0.3% (3 / 1,024 MB)</span>
+            </div><div class="progress-row">
+                <span class="progress-name">ECECDR_IND</span>
+                <div class="progress-bar">
+                    <div class="progress-fill " style="width: 0.1%"></div>
+                </div>
+                <span class="progress-value">0.1% (1 / 1,024 MB)</span>
+            </div>
+        </div>
+        
+        <!-- Top SQL -->
+        <div class="card full-width" style="margin-bottom: 1.5rem;">
+            <h2>🔍 Top SQL by Elapsed Time</h2>
+            <table>
+                <thead>
+                    <tr><th>SQL ID</th><th>Elapsed (s)</th><th>Executions</th><th>Gets/Exec</th><th>Preview</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="sql-id">bmjz6dqutqtru</td>
+                        <td>532.72</td>
+                        <td>21</td>
+                        <td>177,701</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name as name,                ROUND(df.total_bytes/1024/1024</td>
+                    </tr><tr>
+                        <td class="sql-id">01tkngvk1x5bz</td>
+                        <td>182.68</td>
+                        <td>7</td>
+                        <td>182,580</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name as name,                ROUND(df.bytes/1024/1024) as t</td>
+                    </tr><tr>
+                        <td class="sql-id">9mn01buvwtzcg</td>
+                        <td>152.92</td>
+                        <td>7</td>
+                        <td>153,418</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name,                ROUND((df.bytes - NVL(fs.bytes, 0))/df</td>
+                    </tr><tr>
+                        <td class="sql-id">01tkngvk1x5bz</td>
+                        <td>111.82</td>
+                        <td>5</td>
+                        <td>155,981</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name as name,                ROUND(df.bytes/1024/1024) as t</td>
+                    </tr><tr>
+                        <td class="sql-id">9mn01buvwtzcg</td>
+                        <td>104.32</td>
+                        <td>4</td>
+                        <td>182,584</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name,                ROUND((df.bytes - NVL(fs.bytes, 0))/df</td>
+                    </tr><tr>
+                        <td class="sql-id">b6usrg82hwsa3</td>
+                        <td>87.19</td>
+                        <td>1</td>
+                        <td>6,227,791</td>
+                        <td class="sql-preview">call dbms_stats.gather_database_stats_job_proc (  )</td>
+                    </tr><tr>
+                        <td class="sql-id">bdab6rs0z0876</td>
+                        <td>26.66</td>
+                        <td>1</td>
+                        <td>182,601</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name as name,            ROUND(df.bytes/1024/1024) as total</td>
+                    </tr><tr>
+                        <td class="sql-id">17j82fqm2st9a</td>
+                        <td>26.36</td>
+                        <td>1</td>
+                        <td>182,751</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name,                    ROUND(df.total_bytes/1024/1024) as</td>
+                    </tr><tr>
+                        <td class="sql-id">4q2b97kzqt2hq</td>
+                        <td>26.26</td>
+                        <td>1</td>
+                        <td>183,075</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name,                    ROUND(df.total_bytes/1024/1024) as</td>
+                    </tr><tr>
+                        <td class="sql-id">fa503h9dntj94</td>
+                        <td>25.88</td>
+                        <td>1</td>
+                        <td>182,601</td>
+                        <td class="sql-preview">SELECT ts.tablespace_name,                ROUND((df.bytes - NVL(fs.bytes, 0))/df</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Wait Events & Stats -->
+        <div class="grid">
+            <div class="card">
+                <h2>⏳ Top Wait Events</h2>
+                <table>
+                    <thead><tr><th>Event</th><th>Time (s)</th></tr></thead>
+                    <tbody>
+                        <tr><td>db file sequential read</td><td>1,120.85</td></tr><tr><td>resmgr:cpu quantum</td><td>36.42</td></tr><tr><td>control file sequential read</td><td>13.15</td></tr><tr><td>enq: JG - queue lock</td><td>10.00</td></tr><tr><td>db file scattered read</td><td>1.73</td></tr><tr><td>sort segment request</td><td>1.00</td></tr><tr><td>SQL*Net break/reset to client</td><td>1.00</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card">
+                <h2>📈 System Statistics</h2>
+                <div class="info-row"><span class="info-label">user commits</span><span>4,583</span></div><div class="info-row"><span class="info-label">user rollbacks</span><span>430</span></div><div class="info-row"><span class="info-label">physical reads</span><span>2,795,251</span></div><div class="info-row"><span class="info-label">physical writes</span><span>28</span></div><div class="info-row"><span class="info-label">parse count (total)</span><span>51,320</span></div><div class="info-row"><span class="info-label">execute count</span><span>487,136</span></div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 2rem; color: #666; font-size: 0.875rem;">
+            ODAOS - Oracle Database AI Operations System | Report generated at 2026-02-01 16:37:07
+        </div>
+    </div>
+</body>
+</html>
