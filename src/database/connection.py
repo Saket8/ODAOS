@@ -4,6 +4,7 @@ Provides connection pooling and query execution for Oracle databases
 using the oracledb driver with OCI integration.
 """
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
@@ -13,9 +14,39 @@ from oci.database import DatabaseClient
 
 from ..core.config import get_settings
 
+# Setup logging
+logger = logging.getLogger(__name__)
+
+# Initialize Oracle thick mode for Native Network Encryption (NNE) support
+# This must be done before any connection is created
+_thick_mode_initialized = False
+
+def _init_thick_mode():
+    """Initialize Oracle thick mode with Instant Client if configured."""
+    global _thick_mode_initialized
+    if _thick_mode_initialized:
+        return True
+    
+    try:
+        settings = get_settings()
+        if settings.oracle_client_path:
+            oracledb.init_oracle_client(lib_dir=settings.oracle_client_path)
+            logger.info(f"Oracle thick mode initialized with client at: {settings.oracle_client_path}")
+            _thick_mode_initialized = True
+            return True
+        else:
+            logger.warning("ORACLE_CLIENT_PATH not set - using thin mode (may fail with NNE)")
+            return False
+    except Exception as e:
+        logger.error(f"Failed to initialize Oracle thick mode: {e}")
+        return False
+
+# Try to initialize thick mode on module load
+_init_thick_mode()
+
 
 class OracleConnectionManager:
-    """Manages Oracle database connections with async connection pooling."""
+    """Manages Oracle database connections with thick mode support."""
     
     def __init__(
         self,
@@ -46,12 +77,13 @@ class OracleConnectionManager:
         self.min_connections = min_connections
         self.max_connections = max_connections
         
-        self._pool: Optional[oracledb.AsyncConnectionPool] = None
+        self._connection: Optional[oracledb.Connection] = None
         self._oci_client: Optional[DatabaseClient] = None
+        self._initialized = False
     
     async def initialize(self) -> None:
-        """Initialize the connection pool."""
-        if self._pool is not None:
+        """Initialize the database connection."""
+        if self._initialized:
             return
         
         if not all([self.dsn, self.user, self.password]):
@@ -60,46 +92,40 @@ class OracleConnectionManager:
                 "Set ORACLE_DSN, ORACLE_USER, ORACLE_PASSWORD in .env file."
             )
         
-        # Enable thick mode for Native Network Encryption (NNE) support
-        # Required when database has SQLNET.ENCRYPTION_SERVER = required
-        try:
-            oracledb.init_oracle_client(lib_dir=r"C:\oracle\instantclient_21_20")
-        except oracledb.ProgrammingError:
-            # Already initialized - ignore
-            pass
-        
-        self._pool = oracledb.create_pool_async(
-            user=self.user,
-            password=self.password,
-            dsn=self.dsn,
-            min=self.min_connections,
-            max=self.max_connections,
-            getmode=oracledb.POOL_GETMODE_WAIT,
+        # Use synchronous connection in thick mode
+        # Run in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        self._connection = await loop.run_in_executor(
+            None,
+            lambda: oracledb.connect(
+                user=self.user,
+                password=self.password,
+                dsn=self.dsn
+            )
         )
+        self._initialized = True
+        logger.info(f"Connected to database: {self.dsn}")
     
     async def close(self) -> None:
-        """Close the connection pool."""
-        if self._pool:
-            await self._pool.close()
-            self._pool = None
+        """Close the connection."""
+        if self._connection:
+            self._connection.close()
+            self._connection = None
+            self._initialized = False
     
     @asynccontextmanager
     async def get_connection(self):
-        """Get a connection from the pool as an async context manager.
+        """Get a connection as an async context manager.
         
         Usage:
             async with manager.get_connection() as conn:
                 cursor = conn.cursor()
                 ...
         """
-        if self._pool is None:
+        if not self._initialized:
             await self.initialize()
         
-        connection = await self._pool.acquire()
-        try:
-            yield connection
-        finally:
-            await self._pool.release(connection)
+        yield self._connection
     
     async def execute_query(
         self, 
@@ -117,17 +143,25 @@ class OracleConnectionManager:
         Returns:
             List of row dictionaries with column names as keys.
         """
-        async with self.get_connection() as connection:
-            async with connection.cursor() as cursor:
-                await cursor.execute(query, params or {})
+        if not self._initialized:
+            await self.initialize()
+        
+        # Execute in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        
+        def _execute():
+            with self._connection.cursor() as cursor:
+                cursor.execute(query, params or {})
                 
                 if not fetch_all:
                     return []
                 
                 columns = [col[0] for col in cursor.description]
-                rows = await cursor.fetchall()
+                rows = cursor.fetchall()
                 
                 return [dict(zip(columns, row)) for row in rows]
+        
+        return await loop.run_in_executor(None, _execute)
     
     async def execute_many(
         self, 

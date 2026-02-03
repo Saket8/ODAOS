@@ -17,6 +17,7 @@ class LLMProvider(str, Enum):
     GROQ = "groq"
     OLLAMA = "ollama"
     ANTHROPIC = "anthropic"
+    GEMINI = "gemini"
 
 
 class Settings(BaseSettings):
@@ -47,6 +48,16 @@ class Settings(BaseSettings):
     groq_model: str = Field(
         default="llama-3.3-70b-versatile",
         description="Groq model name"
+    )
+    
+    # Gemini Settings
+    google_api_key: Optional[SecretStr] = Field(
+        default=None,
+        description="Google AI Studio API key for Gemini"
+    )
+    gemini_model: str = Field(
+        default="gemini-2.0-flash",
+        description="Gemini model name"
     )
     
     # Ollama Settings (for local development)
@@ -92,6 +103,10 @@ class Settings(BaseSettings):
         default=None,
         description="Oracle database password"
     )
+    oracle_client_path: Optional[str] = Field(
+        default=None,
+        description="Path to Oracle Instant Client for thick mode (required for NNE)"
+    )
     
     # SSH Tunnel Settings (for MVP via Bastion)
     bastion_host: Optional[str] = Field(
@@ -129,6 +144,8 @@ class Settings(BaseSettings):
             return self.ollama_model
         elif self.odaos_llm_provider == LLMProvider.ANTHROPIC:
             return self.anthropic_model
+        elif self.odaos_llm_provider == LLMProvider.GEMINI:
+            return self.gemini_model
         raise ValueError(f"Unknown provider: {self.odaos_llm_provider}")
 
 

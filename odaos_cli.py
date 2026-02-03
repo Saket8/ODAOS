@@ -9,8 +9,20 @@ Usage:
 """
 import asyncio
 import sys
+import os
 from pathlib import Path
 from datetime import datetime
+
+# Set UTF-8 encoding for Windows (needed for terminal charts)
+if sys.platform == "win32":
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    # Enable UTF-8 console output on Windows
+    try:
+        import codecs
+        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer, errors="replace")
+        sys.stderr = codecs.getwriter("utf-8")(sys.stderr.buffer, errors="replace")
+    except Exception:
+        pass
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -53,6 +65,7 @@ HELP_TEXT = """
 | `/incidents` | Check for incidents and blocking sessions |
 | `/costs` | Get OCI cost summary |
 | `/forecast` | Get cost forecast |
+| `/analytics` | Enter analytics mode for visualizations |
 | `/clear` | Clear conversation history |
 | `/quit` | Exit the CLI |
 
@@ -63,6 +76,12 @@ HELP_TEXT = """
 - "Give me a complete health check"
 - "Why is the database slow?"
 - "Find idle resources"
+
+**Analytics Mode Queries:**
+- "Show me customer distribution by region"
+- "What's our product market share?"
+- "Display customer acquisition trends"
+- "Analyze churn by region"
 """
 
 
@@ -72,17 +91,25 @@ class ODAOSCLI:
     def __init__(self):
         """Initialize the CLI."""
         self.orchestrator = None
+        self.analytics_agent = None
         self.conversation_id = f"cli-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        self.analytics_mode = False
     
     async def initialize(self):
         """Initialize the orchestrator."""
         console.print("\n[dim]Initializing ODAOS components...[/dim]")
         
         from src.orchestrator import ODAOSOrchestrator
+        from src.agents.analytics import AnalyticsAgent
+        
         self.orchestrator = ODAOSOrchestrator()
         self.orchestrator.new_conversation(self.conversation_id)
         
-        console.print("[green]✓ Ready![/green]\n")
+        # Initialize analytics agent
+        self.analytics_agent = AnalyticsAgent()
+        
+        console.print("[green]Ready![/green]\n")
+
     
     async def process_command(self, user_input: str) -> str:
         """Process special commands."""
@@ -111,9 +138,38 @@ class ODAOSCLI:
         elif cmd == "/forecast":
             return await self.orchestrator.chat("Forecast our OCI costs for the next 30 days")
         
+        elif cmd == "/analytics":
+            self.analytics_mode = True
+            return """**📊 Analytics Mode Activated!**
+
+**Ask anything in your own words** - the AI understands natural language!
+
+Examples (but feel free to phrase differently):
+
+🥧 **Pie Charts** - Customer regions, product share, service revenue
+🔥 **Heatmaps** - Overdue vs ARPU, usage by time, churn risk, complaints
+📈 **Scatter Plots** - ARPU vs churn probability
+📉 **Line Charts** - Acquisition trends, revenue growth
+
+**Sample ways to ask:**
+- "Show me where our customers are located"
+- "Which products are selling best?"
+- "Who are our high-risk customers?"
+- "How has revenue changed over time?"
+- "Compare complaints across regions"
+
+The AI interprets your intent - no fixed phrasing required!
+
+Type `/back` to return to normal mode."""
+        
+        elif cmd == "/back":
+            self.analytics_mode = False
+            return "Returned to normal mode."
+        
         elif cmd == "/clear":
             self.conversation_id = f"cli-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
             self.orchestrator.new_conversation(self.conversation_id)
+            self.analytics_agent.new_conversation()
             return "Conversation history cleared. Starting fresh!"
         
         elif cmd in ["/quit", "/exit", "/q"]:
@@ -163,13 +219,20 @@ class ODAOSCLI:
                         ))
                         continue
                 
-                # Regular query - send to orchestrator
-                response = await self.chat(user_input)
+                # Regular query - send to appropriate agent
+                if self.analytics_mode:
+                    response = await self.analytics_agent.chat(user_input)
+                    title = "[bold magenta]Analytics[/bold magenta]"
+                    border = "magenta"
+                else:
+                    response = await self.chat(user_input)
+                    title = "[bold green]ODAOS[/bold green]"
+                    border = "green"
                 
                 console.print(Panel(
                     Markdown(response),
-                    title="[bold green]ODAOS[/bold green]",
-                    border_style="green"
+                    title=title,
+                    border_style=border
                 ))
                 console.print()
                 

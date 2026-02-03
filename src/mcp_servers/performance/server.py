@@ -290,88 +290,297 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 
 async def get_database_metrics_handler() -> dict:
-    """Get database performance metrics from live database."""
+    """Get database performance metrics.
+    
+    Queries v$sysmetric, v$session, and related views for current metrics.
+    Falls back to mock data if database is not connected.
+    """
     try:
-        from src.database.live_queries import LiveDBQueries
+        from src.database.connection import get_connection_manager
         
-        with LiveDBQueries() as db:
-            info = db.get_database_info()
-            metrics = db.get_performance_metrics()
-            
-            return {
-                "timestamp": metrics["timestamp"],
-                "database": info["database"]["NAME"],
-                "pdb": info["database"]["PDB"],
-                "cpu": {
-                    "host_cpu_utilization": 0,  # Not available without special grants
-                    "db_cpu_percentage": 0,
-                },
-                "memory": {
-                    "sga_total_mb": metrics["sga"].get("Total SGA Size", 0),
-                    "buffer_cache_mb": metrics["sga"].get("Buffer Cache Size", 0),
-                    "shared_pool_mb": metrics["sga"].get("Shared Pool Size", 0),
-                    "pga_mb": metrics["pga_mb"],
-                },
-                "sessions": {
-                    "active_sessions": metrics["sessions"]["ACTIVE"] or 0,
-                    "total_sessions": metrics["sessions"]["TOTAL"] or 0,
-                    "inactive_sessions": metrics["sessions"]["INACTIVE"] or 0,
-                },
-                "top_wait_events": [
-                    {"event": w["EVENT"], "time_secs": w["TIME_SECS"], "wait_class": w["WAIT_CLASS"]}
-                    for w in metrics["wait_events"][:5]
-                ],
-                "system_stats": metrics["system_stats"],
-            }
+        manager = get_connection_manager()
+        
+        # Check if we have database credentials configured
+        if not manager.dsn or not manager.user:
+            logger.info("Database not configured, using mock data")
+            return get_mock_database_metrics()
+        
+        # Initialize connection pool
+        await manager.initialize()
+        
+        session_result = []
+        instance_result = []
+        sga_result = []
+        wait_result = []
+        
+        # Get session metrics
+        try:
+            session_query = """
+            SELECT 
+                COUNT(*) as total_sessions,
+                SUM(CASE WHEN status = 'ACTIVE' AND type = 'USER' THEN 1 ELSE 0 END) as active_sessions,
+                SUM(CASE WHEN blocking_session IS NOT NULL THEN 1 ELSE 0 END) as blocked_sessions
+            FROM V$SESSION
+            """
+            session_result = await manager.execute_query(session_query)
+        except Exception as e:
+            logger.warning(f"V$SESSION query failed: {e}")
+        
+        # Get database version and instance info
+        try:
+            instance_query = """
+            SELECT 
+                instance_name,
+                host_name,
+                version,
+                status,
+                database_status
+            FROM V$INSTANCE
+            """
+            instance_result = await manager.execute_query(instance_query)
+        except Exception as e:
+            logger.warning(f"V$INSTANCE query failed: {e}")
+        
+        # Get SGA info
+        try:
+            sga_query = """
+            SELECT 
+                SUM(CASE WHEN name = 'Fixed SGA Size' THEN bytes ELSE 0 END) as fixed_sga,
+                SUM(bytes) as total_sga
+            FROM V$SGAINFO
+            """
+            sga_result = await manager.execute_query(sga_query)
+        except Exception as e:
+            logger.warning(f"V$SGAINFO query failed: {e}")
+        
+        # Get top wait events
+        try:
+            wait_query = """
+            SELECT event, wait_class, total_waits, time_waited
+            FROM V$SYSTEM_EVENT
+            WHERE wait_class != 'Idle'
+            ORDER BY time_waited DESC
+            FETCH FIRST 5 ROWS ONLY
+            """
+            wait_result = await manager.execute_query(wait_query)
+        except Exception as e:
+            logger.warning(f"V$SYSTEM_EVENT query failed: {e}")
+        
+        session_data = session_result[0] if session_result else {}
+        instance_data = instance_result[0] if instance_result else {}
+        sga_data = sga_result[0] if sga_result else {}
+        
+        result = {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "instance": {
+                "name": instance_data.get('INSTANCE_NAME', 'Unknown'),
+                "host": instance_data.get('HOST_NAME', 'Unknown'),
+                "version": instance_data.get('VERSION', 'Unknown'),
+                "status": instance_data.get('STATUS', 'Unknown'),
+            },
+            "sessions": {
+                "active_sessions": int(session_data.get('ACTIVE_SESSIONS', 0)),
+                "total_sessions": int(session_data.get('TOTAL_SESSIONS', 0)),
+                "max_sessions": 1000,  # Default
+                "blocked_sessions": int(session_data.get('BLOCKED_SESSIONS', 0)),
+            },
+            "memory": {
+                "sga_total_bytes": int(sga_data.get('TOTAL_SGA', 0)),
+            },
+            "top_wait_events": [
+                {
+                    "event": w.get('EVENT', 'Unknown'),
+                    "wait_class": w.get('WAIT_CLASS', 'Unknown'),
+                    "total_waits": int(w.get('TOTAL_WAITS', 0)),
+                    "time_waited": int(w.get('TIME_WAITED', 0)),
+                }
+                for w in wait_result
+            ],
+        }
+        
+        logger.info(f"Retrieved live metrics from {instance_data.get('INSTANCE_NAME', 'database')}")
+        return result
+        
     except Exception as e:
-        logger.warning(f"Live database failed, using mock: {e}")
+        logger.warning(f"Database connection failed, using mock data: {e}")
         return get_mock_database_metrics()
 
 
 async def analyze_top_sql_handler(top_n: int = 10, order_by: str = "elapsed_time") -> dict:
-    """Analyze top SQL statements from live database."""
+    """Analyze top SQL statements.
+    
+    Queries v$sql for the most resource-intensive SQL statements.
+    Falls back to mock data if database is not connected.
+    """
     try:
-        from src.database.live_queries import LiveDBQueries
+        from src.database.connection import get_connection_manager
         
-        with LiveDBQueries() as db:
-            top_sql = db.get_top_sql(top_n, order_by)
-            
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            logger.info("Database not configured, using mock data")
             return {
                 "timestamp": datetime.now().isoformat(),
+                "data_source": "MOCK",
                 "parameters": {"top_n": top_n, "order_by": order_by},
-                "sql_statements": [
-                    {
-                        "sql_id": s["SQL_ID"],
-                        "sql_text": s.get("SQL_PREVIEW", ""),
-                        "elapsed_time_secs": s["ELAPSED_SECS"],
-                        "cpu_time_secs": s["CPU_SECS"],
-                        "executions": s["EXECUTIONS"],
-                        "buffer_gets": s["BUFFER_GETS"],
-                        "disk_reads": s["DISK_READS"],
-                        "gets_per_exec": s["GETS_PER_EXEC"] or 0,
-                    }
-                    for s in top_sql
-                ],
+                "sql_statements": get_mock_top_sql(top_n, order_by),
             }
-    except Exception as e:
-        logger.warning(f"Live database failed, using mock: {e}")
+        
+        await manager.initialize()
+        
+        # Map order_by to column name
+        order_column = {
+            "elapsed_time": "ELAPSED_TIME",
+            "cpu_time": "CPU_TIME", 
+            "executions": "EXECUTIONS",
+            "buffer_gets": "BUFFER_GETS"
+        }.get(order_by, "ELAPSED_TIME")
+        
+        sql_query = f"""
+        SELECT * FROM (
+            SELECT 
+                sql_id,
+                SUBSTR(sql_text, 1, 200) as sql_text,
+                executions,
+                ROUND(elapsed_time/1000000, 2) as elapsed_secs,
+                ROUND(cpu_time/1000000, 2) as cpu_secs,
+                buffer_gets,
+                disk_reads,
+                rows_processed,
+                parsing_schema_name,
+                plan_hash_value
+            FROM V$SQL
+            WHERE executions > 0
+              AND parsing_schema_name NOT IN ('SYS', 'SYSTEM', 'DBSNMP')
+            ORDER BY {order_column} DESC
+        )
+        WHERE ROWNUM <= :top_n
+        """
+        
+        result = await manager.execute_query(sql_query, {"top_n": top_n})
+        
+        sql_statements = []
+        for row in result:
+            sql_statements.append({
+                "sql_id": row.get('SQL_ID', 'Unknown'),
+                "sql_text": row.get('SQL_TEXT', ''),
+                "executions": int(row.get('EXECUTIONS', 0)),
+                "elapsed_time_secs": float(row.get('ELAPSED_SECS', 0)),
+                "cpu_time_secs": float(row.get('CPU_SECS', 0)),
+                "buffer_gets": int(row.get('BUFFER_GETS', 0)),
+                "disk_reads": int(row.get('DISK_READS', 0)),
+                "rows_processed": int(row.get('ROWS_PROCESSED', 0)),
+                "parsing_schema": row.get('PARSING_SCHEMA_NAME', 'Unknown'),
+            })
+        
+        logger.info(f"Retrieved {len(sql_statements)} SQL statements from live database")
         return {
             "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "parameters": {"top_n": top_n, "order_by": order_by},
+            "sql_statements": sql_statements,
+        }
+        
+    except Exception as e:
+        logger.warning(f"Database connection failed, using mock data: {e}")
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "MOCK",
             "parameters": {"top_n": top_n, "order_by": order_by},
             "sql_statements": get_mock_top_sql(top_n, order_by),
         }
 
 
 async def check_tablespace_usage_handler(threshold: int = 85) -> dict:
-    """Check tablespace usage from live database."""
+    """Check tablespace usage against threshold.
+    
+    Queries dba_tablespace_usage_metrics for tablespace information.
+    Falls back to mock data if database is not connected.
+    """
     try:
-        from src.database.live_queries import LiveDBQueries
+        from src.database.connection import get_connection_manager
         
-        with LiveDBQueries() as db:
-            return db.get_tablespace_usage(threshold)
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            logger.info("Database not configured, using mock data")
+            return get_mock_tablespace_usage(threshold)
+        
+        await manager.initialize()
+        
+        ts_query = """
+        SELECT 
+            ts.tablespace_name,
+            ts.status,
+            ROUND(df.total_bytes/1024/1024, 2) as total_mb,
+            ROUND((df.total_bytes - NVL(fs.free_bytes, 0))/1024/1024, 2) as used_mb,
+            ROUND(NVL(fs.free_bytes, 0)/1024/1024, 2) as free_mb,
+            ROUND((df.total_bytes - NVL(fs.free_bytes, 0))/df.total_bytes * 100, 2) as used_pct,
+            df.autoextensible
+        FROM dba_tablespaces ts
+        LEFT JOIN (
+            SELECT tablespace_name, SUM(bytes) as total_bytes,
+                   MAX(autoextensible) as autoextensible
+            FROM dba_data_files
+            GROUP BY tablespace_name
+        ) df ON ts.tablespace_name = df.tablespace_name
+        LEFT JOIN (
+            SELECT tablespace_name, SUM(bytes) as free_bytes
+            FROM dba_free_space
+            GROUP BY tablespace_name
+        ) fs ON ts.tablespace_name = fs.tablespace_name
+        WHERE ts.contents = 'PERMANENT'
+          AND df.total_bytes IS NOT NULL
+        ORDER BY used_pct DESC
+        """
+        
+        result = await manager.execute_query(ts_query)
+        
+        alerts = []
+        healthy = []
+        
+        for row in result:
+            used_pct = float(row.get('USED_PCT', 0))
+            ts_info = {
+                "tablespace_name": row.get('TABLESPACE_NAME', 'Unknown'),
+                "status": row.get('STATUS', 'Unknown'),
+                "used_mb": float(row.get('USED_MB', 0)),
+                "total_mb": float(row.get('TOTAL_MB', 0)),
+                "free_mb": float(row.get('FREE_MB', 0)),
+                "used_percent": used_pct,
+                "autoextend": row.get('AUTOEXTENSIBLE', 'NO') == 'YES',
+            }
             
+            if used_pct >= 95:
+                ts_info["severity"] = "CRITICAL"
+                ts_info["action"] = f"Immediately extend tablespace {ts_info['tablespace_name']} or add datafile"
+                alerts.append(ts_info)
+            elif used_pct >= threshold:
+                ts_info["severity"] = "WARNING"
+                ts_info["action"] = f"Plan to extend tablespace {ts_info['tablespace_name']} within 48 hours"
+                alerts.append(ts_info)
+            else:
+                ts_info["severity"] = "OK"
+                healthy.append(ts_info)
+        
+        logger.info(f"Retrieved {len(alerts) + len(healthy)} tablespaces from live database")
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "threshold": threshold,
+            "summary": {
+                "total_tablespaces": len(alerts) + len(healthy),
+                "critical_count": len([a for a in alerts if a["severity"] == "CRITICAL"]),
+                "warning_count": len([a for a in alerts if a["severity"] == "WARNING"]),
+                "healthy_count": len(healthy),
+            },
+            "alerts": alerts,
+            "healthy": healthy,
+        }
+        
     except Exception as e:
-        logger.warning(f"Live database failed, using mock: {e}")
+        logger.warning(f"Database connection failed, using mock data: {e}")
         return get_mock_tablespace_usage(threshold)
 
 

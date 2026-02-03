@@ -472,73 +472,235 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 
 async def monitor_alert_log_handler(hours: int = 24) -> dict:
-    """Monitor alert log for errors - uses mock data as alert log requires special access."""
-    # Alert log access requires V_$DIAG_ALERT_EXT which may not be granted
-    # Keep mock data for this handler
-    return get_mock_alert_log_errors(hours)
+    """Monitor alert log for errors.
+    
+    Note: V$DIAG_ALERT_EXT requires specific privileges that may not be available.
+    Falls back to mock data if not accessible.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            logger.info("Database not configured, using mock data")
+            return get_mock_alert_log_errors(hours)
+        
+        # Alert log access typically requires additional privileges
+        # Return mock data for now but indicate connection is live
+        mock_result = get_mock_alert_log_errors(hours)
+        mock_result["data_source"] = "MOCK"
+        mock_result["note"] = "Alert log monitoring requires V$DIAG_ALERT_EXT access"
+        return mock_result
+        
+    except Exception as e:
+        logger.warning(f"Database connection failed, using mock data: {e}")
+        return get_mock_alert_log_errors(hours)
 
 
 async def check_blocking_sessions_handler() -> dict:
-    """Check for blocking sessions from live database."""
+    """Check for blocking sessions using live database queries."""
     try:
-        from src.database.live_queries import LiveDBQueries
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
         
-        with LiveDBQueries() as db:
-            blocking = db.get_blocking_sessions()
+        if not manager.dsn or not manager.user:
+            logger.info("Database not configured, using mock data")
+            return get_mock_blocking_sessions()
+        
+        await manager.initialize()
+        
+        # Query blocking sessions from V$SESSION
+        blocking_query = """
+        SELECT 
+            s1.sid as blocker_sid,
+            s1.serial# as blocker_serial,
+            s1.username as blocker_username,
+            s1.machine as blocker_machine,
+            s1.program as blocker_program,
+            s1.sql_id as blocker_sql_id,
+            s1.status as blocker_status,
+            s2.sid as blocked_sid,
+            s2.serial# as blocked_serial,
+            s2.username as blocked_username,
+            s2.seconds_in_wait,
+            s2.event as wait_event
+        FROM V$SESSION s1
+        JOIN V$SESSION s2 ON s1.sid = s2.blocking_session
+        WHERE s2.blocking_session IS NOT NULL
+        ORDER BY s2.seconds_in_wait DESC
+        """
+        
+        result = await manager.execute_query(blocking_query)
+        
+        # Group by blocker
+        blockers_dict = {}
+        for row in result:
+            blocker_sid = row.get('BLOCKER_SID')
+            if blocker_sid not in blockers_dict:
+                blockers_dict[blocker_sid] = {
+                    "blocker_sid": int(blocker_sid),
+                    "blocker_serial": int(row.get('BLOCKER_SERIAL', 0)),
+                    "blocker_username": row.get('BLOCKER_USERNAME', 'Unknown'),
+                    "blocker_machine": row.get('BLOCKER_MACHINE', 'Unknown'),
+                    "blocker_program": row.get('BLOCKER_PROGRAM', 'Unknown'),
+                    "blocker_sql_id": row.get('BLOCKER_SQL_ID', 'Unknown'),
+                    "blocker_status": row.get('BLOCKER_STATUS', 'Unknown'),
+                    "blocked_sessions": [],
+                    "max_wait_secs": 0,
+                }
             
-            # Format for agent consumption
-            blockers = []
-            for b in blocking.get("blockers", []):
-                blockers.append({
-                    "blocker_sid": b["SID"],
-                    "blocker_serial": b["SERIAL#"],
-                    "blocker_username": b.get("USERNAME"),
-                    "blocker_machine": b.get("MACHINE"),
-                    "blocker_program": b.get("PROGRAM"),
-                    "blocker_sql_id": b.get("SQL_ID"),
-                    "blocked_session_count": b.get("VICTIMS", 0),
-                    "risk_level": "HIGH" if b.get("VICTIMS", 0) > 2 else "MEDIUM",
-                })
-            
-            return {
-                "timestamp": blocking["timestamp"],
-                "summary": {
-                    "blocking_sessions": blocking["blocker_count"],
-                    "total_blocked_sessions": blocking["blocked_count"],
-                },
-                "blockers": blockers,
-            }
+            wait_secs = int(row.get('SECONDS_IN_WAIT', 0))
+            blockers_dict[blocker_sid]["blocked_sessions"].append({
+                "sid": int(row.get('BLOCKED_SID', 0)),
+                "serial": int(row.get('BLOCKED_SERIAL', 0)),
+                "username": row.get('BLOCKED_USERNAME', 'Unknown'),
+                "wait_time_secs": wait_secs,
+                "waiting_for": row.get('WAIT_EVENT', 'Unknown'),
+            })
+            blockers_dict[blocker_sid]["max_wait_secs"] = max(
+                blockers_dict[blocker_sid]["max_wait_secs"], wait_secs
+            )
+        
+        blockers = list(blockers_dict.values())
+        total_blocked = sum(len(b["blocked_sessions"]) for b in blockers)
+        
+        # Determine risk level based on wait time
+        for b in blockers:
+            if b["max_wait_secs"] > 600:  # 10+ minutes
+                b["risk_level"] = "HIGH"
+                b["recommendation"] = "Long blocking session - consider killing after verification"
+            elif b["max_wait_secs"] > 120:  # 2+ minutes
+                b["risk_level"] = "MEDIUM"
+                b["recommendation"] = "Moderate blocking - monitor and investigate"
+            else:
+                b["risk_level"] = "LOW"
+                b["recommendation"] = "Normal lock contention - likely transient"
+        
+        logger.info(f"Found {len(blockers)} blocking sessions from live database")
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "summary": {
+                "blocking_sessions": len(blockers),
+                "total_blocked_sessions": total_blocked,
+                "longest_wait_secs": max((b["max_wait_secs"] for b in blockers), default=0),
+                "critical_blockers": len([b for b in blockers if b["risk_level"] == "HIGH"]),
+            },
+            "blockers": sorted(blockers, key=lambda x: x["max_wait_secs"], reverse=True),
+            "blocking_chains": [
+                f"Session {b['blocker_sid']} -> {len(b['blocked_sessions'])} sessions waiting"
+                for b in blockers[:5]  # Top 5
+            ],
+        }
+        
     except Exception as e:
-        logger.warning(f"Live database failed, using mock: {e}")
+        logger.warning(f"Database connection failed, using mock data: {e}")
         return get_mock_blocking_sessions()
 
 
 async def get_tablespace_status_handler() -> dict:
-    """Get tablespace status from live database."""
+    """Get tablespace status for self-healing using live database queries."""
     try:
-        from src.database.live_queries import LiveDBQueries
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
         
-        with LiveDBQueries() as db:
-            ts_data = db.get_tablespace_usage()
+        if not manager.dsn or not manager.user:
+            logger.info("Database not configured, using mock data")
+            return get_mock_tablespace_status()
+        
+        await manager.initialize()
+        
+        ts_query = """
+        SELECT 
+            ts.tablespace_name,
+            ts.status,
+            ROUND(df.total_bytes/1024/1024, 2) as total_mb,
+            ROUND((df.total_bytes - NVL(fs.free_bytes, 0))/1024/1024, 2) as used_mb,
+            ROUND(NVL(fs.free_bytes, 0)/1024/1024, 2) as free_mb,
+            ROUND((df.total_bytes - NVL(fs.free_bytes, 0))/df.total_bytes * 100, 2) as used_pct,
+            df.autoextensible,
+            ROUND(df.max_bytes/1024/1024, 2) as max_mb
+        FROM dba_tablespaces ts
+        LEFT JOIN (
+            SELECT tablespace_name, 
+                   SUM(bytes) as total_bytes,
+                   SUM(maxbytes) as max_bytes,
+                   MAX(autoextensible) as autoextensible
+            FROM dba_data_files
+            GROUP BY tablespace_name
+        ) df ON ts.tablespace_name = df.tablespace_name
+        LEFT JOIN (
+            SELECT tablespace_name, SUM(bytes) as free_bytes
+            FROM dba_free_space
+            GROUP BY tablespace_name
+        ) fs ON ts.tablespace_name = fs.tablespace_name
+        WHERE ts.contents = 'PERMANENT'
+          AND df.total_bytes IS NOT NULL
+        ORDER BY used_pct DESC
+        """
+        
+        result = await manager.execute_query(ts_query)
+        
+        tablespaces = []
+        critical = []
+        warning = []
+        recommendations = []
+        
+        for row in result:
+            used_pct = float(row.get('USED_PCT', 0))
+            ts_name = row.get('TABLESPACE_NAME', 'Unknown')
+            autoextend = row.get('AUTOEXTENSIBLE', 'NO') == 'YES'
             
-            # Format for self-healing analysis
-            tablespaces = []
-            for alert in ts_data.get("alerts", []) + ts_data.get("healthy", []):
-                tablespaces.append({
-                    "name": alert["name"],
-                    "used_mb": alert["used_mb"],
-                    "total_mb": alert["total_mb"],
-                    "used_pct": alert["used_pct"],
-                    "criticality": alert.get("severity", "OK"),
-                })
-            
-            return {
-                "timestamp": ts_data["timestamp"],
-                "summary": ts_data["summary"],
-                "tablespaces": sorted(tablespaces, key=lambda x: x["used_pct"], reverse=True),
+            ts_info = {
+                "name": ts_name,
+                "status": row.get('STATUS', 'Unknown'),
+                "used_mb": float(row.get('USED_MB', 0)),
+                "total_mb": float(row.get('TOTAL_MB', 0)),
+                "free_mb": float(row.get('FREE_MB', 0)),
+                "max_size_mb": float(row.get('MAX_MB', 0)),
+                "used_pct": used_pct,
+                "autoextend": autoextend,
             }
+            
+            # Determine criticality
+            if ts_name in ('SYSTEM', 'SYSAUX', 'UNDO'):
+                ts_info["criticality"] = "SYSTEM"
+            else:
+                ts_info["criticality"] = "APPLICATION"
+            
+            tablespaces.append(ts_info)
+            
+            if used_pct >= 95:
+                critical.append(ts_info)
+                recommendations.append({
+                    "tablespace": ts_name,
+                    "action": "URGENT: Add datafile immediately",
+                    "ddl": f"ALTER TABLESPACE {ts_name} ADD DATAFILE SIZE 1G AUTOEXTEND ON NEXT 100M MAXSIZE 32767M;"
+                })
+            elif used_pct >= 85:
+                warning.append(ts_info)
+                recommendations.append({
+                    "tablespace": ts_name,
+                    "action": "Plan extension within 1 week",
+                    "ddl": f"ALTER TABLESPACE {ts_name} ADD DATAFILE SIZE 1G AUTOEXTEND ON NEXT 100M MAXSIZE 32767M;"
+                })
+        
+        logger.info(f"Retrieved {len(tablespaces)} tablespaces from live database")
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "summary": {
+                "total_tablespaces": len(tablespaces),
+                "critical_count": len(critical),
+                "warning_count": len(warning),
+                "immediate_action_required": len(critical) > 0,
+            },
+            "tablespaces": tablespaces,
+            "recommendations": recommendations[:5],  # Top 5 recommendations
+        }
+        
     except Exception as e:
-        logger.warning(f"Live database failed, using mock: {e}")
+        logger.warning(f"Database connection failed, using mock data: {e}")
         return get_mock_tablespace_status()
 
 

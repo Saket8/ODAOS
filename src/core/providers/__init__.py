@@ -54,6 +54,8 @@ def create_llm(
         return _create_ollama_llm(settings, temperature, max_tokens, **kwargs)
     elif active_provider == LLMProvider.ANTHROPIC:
         return _create_anthropic_llm(settings, temperature, max_tokens, **kwargs)
+    elif active_provider == LLMProvider.GEMINI:
+        return _create_gemini_llm(settings, temperature, max_tokens, **kwargs)
     else:
         raise ValueError(f"Unknown provider: {active_provider}")
 
@@ -103,6 +105,22 @@ def _create_anthropic_llm(settings, temperature: float, max_tokens: int, **kwarg
     )
 
 
+def _create_gemini_llm(settings, temperature: float, max_tokens: int, **kwargs) -> BaseChatModel:
+    """Create Google Gemini LLM instance."""
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    
+    if not settings.google_api_key:
+        raise ValueError("GOOGLE_API_KEY environment variable is required for Gemini provider")
+    
+    return ChatGoogleGenerativeAI(
+        model=settings.gemini_model,
+        google_api_key=settings.google_api_key.get_secret_value(),
+        temperature=temperature,
+        max_output_tokens=max_tokens,
+        **kwargs
+    )
+
+
 def get_provider_info() -> dict:
     """Get information about the currently configured provider.
     
@@ -121,6 +139,8 @@ def get_provider_info() -> dict:
         has_credentials = True  # Local, no credentials needed
     elif provider == "anthropic":
         has_credentials = bool(settings.anthropic_api_key)
+    elif provider == "gemini":
+        has_credentials = bool(settings.google_api_key)
     else:
         has_credentials = False
     
