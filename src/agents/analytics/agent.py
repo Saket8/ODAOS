@@ -36,7 +36,22 @@ from src.core.providers import create_llm
 
 ANALYTICS_SYSTEM_PROMPT = """You are an Analytics Assistant for Oracle BRM (Billing and Revenue Management).
 Your role is to help users visualize billing data through natural language commands.
-Charts are displayed directly in the terminal with live data from the database.
+Charts are generated using live data from the database and rendered as ASCII/ANSI art in the terminal.
+
+### CRITICAL RULES:
+1. **NEVER OMIT THE CHART**: When you call a visualization tool, you MUST include the FULL chart output (the ASCII art) in your final response.
+2. **USE CODE BLOCKS**: Always wrap the ASCII chart output in triple backticks (```) so it renders correctly with fixed-width fonts.
+3. **RESPECT CHART TYPE**: If the user asks for a "pie chart", pass `chart_type='pie'` to the tool. If they ask for a "bar chart", pass `chart_type='bar'`. Default to 'pie' if unspecified for region/market/service breakdowns.
+4. **DO NOT SUMMARIZE ONLY**: While you should provide a brief analysis of the data, the chart itself is the primary deliverable. Do not replace the chart with a text summary.
+
+### Response Template:
+"Here is the visualization for [User Request]:
+
+```
+[INSERT FULL CHART OUTPUT HERE]
+```
+
+[Provide 2-3 bullet points of analysis/insights]"
 
 AVAILABLE VISUALIZATIONS:
 
@@ -54,7 +69,11 @@ HEATMAPS:
 SCATTER PLOTS:
 8. scatter_arpu_churn - ARPU vs churn probability (top 5% at risk highlighted)
 
-Always call the appropriate tool to generate the chart.
+LINE CHARTS:
+9. show_customer_acquisition_trend - Customer acquisition over time
+10. show_revenue_growth_trend - Monthly revenue growth
+
+Always call the appropriate tool to generate the chart and present the result as specified above.
 """
 
 
@@ -87,47 +106,39 @@ def _run_chart_async(chart_func):
 # ============================================================================
 
 @tool
-def show_customer_distribution_pie() -> str:
-    """Create a pie chart of customer distribution by region.
+def show_customer_distribution_pie(chart_type: str = "pie") -> str:
+    """Create a pie chart or bar chart of customer distribution by region.
+    
+    Args:
+        chart_type: The type of chart to generate ('pie' or 'bar').
     
     Derives region from account billing address attributes.
-    
-    Use when user asks about:
-    - Customer distribution by region
-    - Geographic customer breakdown
-    - Where are our customers
-    - Customer by country
     """
-    return _run_chart_async(lambda c: c.pie_customer_by_region())
+    return _run_chart_async(lambda c: c.pie_customer_by_region(chart_type))
 
 
 @tool  
-def show_product_market_share_pie() -> str:
-    """Generate a pie chart showing market share by product category.
+def show_product_market_share_pie(chart_type: str = "pie") -> str:
+    """Generate a pie chart or bar chart showing market share by product category.
     
+    Args:
+        chart_type: The type of chart to generate ('pie' or 'bar').
+        
     Uses product definitions from PDC and revenue attribution from PIN.
-    
-    Use when user asks about:
-    - Product market share
-    - Which products are popular
-    - Product distribution
-    - Subscription breakdown
     """
-    return _run_chart_async(lambda c: c.pie_product_market_share())
+    return _run_chart_async(lambda c: c.pie_product_market_share(chart_type))
 
 
 @tool
-def show_revenue_by_service_pie() -> str:
-    """Visualize revenue composition by service type as a pie chart.
+def show_revenue_by_service_pie(chart_type: str = "pie") -> str:
+    """Visualize revenue composition by service type as a chart.
     
+    Args:
+        chart_type: The type of chart to generate ('pie' or 'bar').
+        
     Maps revenue events to service classes or usage types.
-    
-    Use when user asks about:
-    - Revenue by service type
-    - Service revenue breakdown
-    - Which services generate revenue
     """
-    return _run_chart_async(lambda c: c.pie_revenue_by_service_type())
+    return _run_chart_async(lambda c: c.pie_revenue_by_service_type(chart_type))
 
 
 # ============================================================================

@@ -56,6 +56,8 @@ def create_llm(
         return _create_anthropic_llm(settings, temperature, max_tokens, **kwargs)
     elif active_provider == LLMProvider.GEMINI:
         return _create_gemini_llm(settings, temperature, max_tokens, **kwargs)
+    elif active_provider == LLMProvider.OPENROUTER:
+        return _create_openrouter_llm(settings, temperature, max_tokens, **kwargs)
     else:
         raise ValueError(f"Unknown provider: {active_provider}")
 
@@ -121,6 +123,23 @@ def _create_gemini_llm(settings, temperature: float, max_tokens: int, **kwargs) 
     )
 
 
+def _create_openrouter_llm(settings, temperature: float, max_tokens: int, **kwargs) -> BaseChatModel:
+    """Create OpenRouter LLM instance using OpenAI-compatible API."""
+    from langchain_openai import ChatOpenAI
+    
+    if not settings.openrouter_api_key:
+        raise ValueError("OPENROUTER_API_KEY environment variable is required for OpenRouter provider")
+    
+    return ChatOpenAI(
+        model=settings.openrouter_model,
+        api_key=settings.openrouter_api_key.get_secret_value(),
+        base_url="https://openrouter.ai/api/v1",
+        temperature=temperature,
+        max_tokens=max_tokens,
+        **kwargs
+    )
+
+
 def get_provider_info() -> dict:
     """Get information about the currently configured provider.
     
@@ -141,6 +160,8 @@ def get_provider_info() -> dict:
         has_credentials = bool(settings.anthropic_api_key)
     elif provider == "gemini":
         has_credentials = bool(settings.google_api_key)
+    elif provider == "openrouter":
+        has_credentials = bool(settings.openrouter_api_key)
     else:
         has_credentials = False
     

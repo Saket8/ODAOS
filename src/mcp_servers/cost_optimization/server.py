@@ -144,7 +144,7 @@ class ForecastCostsInput(BaseModel):
 # Live OCI API Functions
 # ============================================================================
 
-def get_live_oci_costs(days: int = 30, group_by: str = "service") -> dict:
+async def get_oci_costs_handler(days: int = 30, group_by: str = "service") -> dict:
     """Get actual OCI costs from Usage API."""
     try:
         from datetime import timezone
@@ -248,7 +248,7 @@ def get_live_oci_costs(days: int = 30, group_by: str = "service") -> dict:
         return {"error": str(e), "source": "OCI_API_ERROR"}
 
 
-def get_live_compute_utilization(compartment_id: Optional[str] = None, threshold: int = 30) -> dict:
+async def analyze_compute_handler(compartment_id: Optional[str] = None, threshold: int = 30) -> dict:
     """Get actual compute utilization from OCI."""
     try:
         compute = get_compute_client()
@@ -312,7 +312,7 @@ def get_live_compute_utilization(compartment_id: Optional[str] = None, threshold
         return {"error": str(e), "source": "OCI_API_ERROR"}
 
 
-def get_live_idle_resources(compartment_id: Optional[str] = None) -> dict:
+async def list_idle_resources_handler(compartment_id: Optional[str] = None) -> dict:
     """Get actual idle resources from OCI."""
     try:
         compute = get_compute_client()
@@ -389,11 +389,11 @@ def get_live_idle_resources(compartment_id: Optional[str] = None) -> dict:
         return {"error": str(e), "source": "OCI_API_ERROR"}
 
 
-def get_live_cost_forecast(days_ahead: int = 30, budget: Optional[float] = None) -> dict:
+async def forecast_costs_handler(days_ahead: int = 30, budget: Optional[float] = None) -> dict:
     """Forecast costs based on recent trends."""
     try:
         # Get last 30 days of costs
-        recent_costs = get_live_oci_costs(days=30, group_by="service")
+        recent_costs = await get_oci_costs_handler(days=30, group_by="service")
         
         if "error" in recent_costs:
             return recent_costs
@@ -618,21 +618,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         if name == "get_oci_costs":
             days = arguments.get("days", 30)
             group_by = arguments.get("group_by", "service")
-            result = get_live_oci_costs(days, group_by)
+            result = await get_oci_costs_handler(days, group_by)
             
         elif name == "analyze_compute_utilization":
             compartment_id = arguments.get("compartment_id")
             threshold = arguments.get("threshold", 30)
-            result = get_live_compute_utilization(compartment_id, threshold)
+            result = await analyze_compute_handler(compartment_id, threshold)
             
         elif name == "list_idle_resources":
             compartment_id = arguments.get("compartment_id")
-            result = get_live_idle_resources(compartment_id)
+            result = await list_idle_resources_handler(compartment_id)
             
         elif name == "forecast_costs":
             days_ahead = arguments.get("days_ahead", 30)
             budget = arguments.get("budget_amount")
-            result = get_live_cost_forecast(days_ahead, budget)
+            result = await forecast_costs_handler(days_ahead, budget)
             
         else:
             result = {"error": f"Unknown tool: {name}"}

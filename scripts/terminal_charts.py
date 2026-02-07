@@ -38,15 +38,82 @@ class TerminalCharts:
         self.manager = get_connection_manager()
         await self.manager.initialize()
     
+    def _render_horizontal_bars(self, labels: list, values: list, title: str) -> str:
+        """Custom robust horizontal bar chart rendering."""
+        if not values:
+            return "No data available to render."
+            
+        total = sum(values)
+        max_val = max(values) if values else 1
+        term_width = 50 # Fixed width for consistency
+        
+        output = [f"--- {title} ---", ""]
+        for label, val in zip(labels, values):
+            pct = (val / total * 100) if total > 0 else 0
+            bar_len = int((val / max_val) * term_width)
+            bar = "█" * bar_len
+            output.append(f"{label:<15} | {bar} {pct:.1f}% ({val})")
+        
+        return "\n".join(output)
+
+    def _render_pie_circular(self, labels: list, values: list, title: str, radius: int = 8) -> str:
+        """Renders a true circular ASCII pie chart (tty-pie style)."""
+        if not values:
+            return "No data available."
+            
+        import math
+        total = sum(values)
+        angles = []
+        current_angle = 0
+        for val in values:
+            fraction = val / total
+            start = current_angle
+            end = current_angle + (fraction * 2 * math.pi)
+            angles.append((start, end))
+            current_angle = end
+
+        symbols = ["█", "▓", "▒", "░", "▣", "□", "▪", "▫"]
+        width = radius * 4
+        height = radius * 2
+        grid = [[" " for _ in range(width + 1)] for _ in range(height + 1)]
+
+        for y in range(-radius, radius + 1):
+            for x in range(-radius * 2, radius * 2 + 1):
+                mx, my = x / 2.0, -y
+                dist = math.sqrt(mx**2 + my**2)
+                
+                if dist <= radius:
+                    angle = math.atan2(my, mx)
+                    if angle < 0: angle += 2 * math.pi
+                    
+                    char = "."
+                    for i, (start, end) in enumerate(angles):
+                        if start <= angle < end:
+                            char = symbols[i % len(symbols)]
+                            break
+                    grid[y + radius][x + radius * 2] = char
+
+        output = [f"--- {title} ---", ""]
+        output.extend(["".join(row) for row in grid])
+        output.append("\n**Breakdown:**")
+        for i, (label, val) in enumerate(zip(labels, values)):
+            char = symbols[i % len(symbols)]
+            output.append(f"  {char} {label}: {val} ({val/total*100:.1f}%)")
+        
+        return "\n".join(output)
+
+    def render_chart(self, labels: list, values: list, title: str, chart_type: str = "bar") -> str:
+        """Dispatcher to render requested chart type."""
+        if "pie" in chart_type.lower():
+            return self._render_pie_circular(labels, values, title)
+        return self._render_horizontal_bars(labels, values, title)
+
     # ==========================================================================
-    # PIE CHARTS (Simulated with horizontal bar + percentages)
+    # DATA RETRIEVAL FUNCTIONS
     # ==========================================================================
     
-    async def pie_customer_by_region(self) -> str:
-        """
-        Create a pie chart of customer distribution by region.
-        Derives region from account billing address attributes.
-        """
+    async def pie_customer_by_region(self, chart_type: str = "pie") -> str:
+        """Create a chart of customer distribution by region."""
         query = """
         SELECT 
             NVL(COUNTRY, 'Unknown') as region,
@@ -56,38 +123,21 @@ class TerminalCharts:
         ORDER BY customer_count DESC
         FETCH FIRST 8 ROWS ONLY
         """
-        
         result = await self.manager.execute_query(query)
-        
         regions = [r['REGION'][:12] for r in result]
         counts = [r['CUSTOMER_COUNT'] for r in result]
-        total = sum(counts)
         
-        # Build pie-style output
-        plt.clear_figure()
-        plt.simple_bar(regions, counts, title="🥧 Customer Distribution by Region", width=60)
-        chart = plt.build()
-        plt.clear_figure()
-        
-        # Add percentage breakdown
-        breakdown = "\n**Percentage Breakdown:**\n"
-        for i, (region, count) in enumerate(zip(regions, counts)):
-            pct = (count / total * 100) if total > 0 else 0
-            bar = "█" * int(pct / 5)
-            breakdown += f"  {region}: {bar} {pct:.1f}% ({count})\n"
+        chart = self.render_chart(regions, counts, "Customer Distribution by Region", chart_type)
         
         return f"""
 {chart}
-{breakdown}
+
 **Data Source:** PIN.ACCOUNT_NAMEINFO_T
-**Total Customers:** {total}
+**Insight:** Regional concentration analysis.
 """
 
-    async def pie_product_market_share(self) -> str:
-        """
-        Generate a pie chart showing market share by product category.
-        Uses product definitions from PDC and revenue attribution from PIN.
-        """
+    async def pie_product_market_share(self, chart_type: str = "pie") -> str:
+        """Generate a chart showing market share by product category."""
         query = """
         SELECT 
             NVL(p.NAME, 'Unknown') as product_name,
@@ -98,36 +148,21 @@ class TerminalCharts:
         ORDER BY subscription_count DESC
         FETCH FIRST 8 ROWS ONLY
         """
-        
         result = await self.manager.execute_query(query)
-        
         products = [r['PRODUCT_NAME'][:18] if r['PRODUCT_NAME'] else 'Unknown' for r in result]
         counts = [r['SUBSCRIPTION_COUNT'] for r in result]
-        total = sum(counts)
         
-        plt.clear_figure()
-        plt.simple_bar(products, counts, title="🥧 Product Market Share", width=60)
-        chart = plt.build()
-        plt.clear_figure()
-        
-        breakdown = "\n**Market Share Breakdown:**\n"
-        for product, count in zip(products, counts):
-            pct = (count / total * 100) if total > 0 else 0
-            bar = "█" * int(pct / 5)
-            breakdown += f"  {product}: {bar} {pct:.1f}%\n"
+        chart = self.render_chart(products, counts, "Product Market Share", chart_type)
         
         return f"""
 {chart}
-{breakdown}
+
 **Data Source:** PIN.PURCHASED_PRODUCT_T + PRODUCT_T
-**Total Subscriptions:** {total}
+**Insight:** High-level product popularity breakdown.
 """
 
-    async def pie_revenue_by_service_type(self) -> str:
-        """
-        Visualize revenue composition by service type as a pie chart.
-        Maps revenue events to service classes or usage types.
-        """
+    async def pie_revenue_by_service_type(self, chart_type: str = "pie") -> str:
+        """Visualize revenue composition by service type."""
         query = """
         SELECT 
             REGEXP_REPLACE(POID_TYPE, '^/item/', '') as service_type,
@@ -138,29 +173,17 @@ class TerminalCharts:
         ORDER BY transaction_count DESC
         FETCH FIRST 8 ROWS ONLY
         """
-        
         result = await self.manager.execute_query(query)
-        
         services = [r['SERVICE_TYPE'][:15] for r in result]
         counts = [r['TRANSACTION_COUNT'] for r in result]
-        total = sum(counts)
         
-        plt.clear_figure()
-        plt.simple_bar(services, counts, title="🥧 Revenue by Service Type", width=60)
-        chart = plt.build()
-        plt.clear_figure()
-        
-        breakdown = "\n**Service Type Breakdown:**\n"
-        for service, count in zip(services, counts):
-            pct = (count / total * 100) if total > 0 else 0
-            bar = "█" * int(pct / 5)
-            breakdown += f"  {service}: {bar} {pct:.1f}%\n"
+        chart = self.render_chart(services, counts, "Revenue by Service Type", chart_type)
         
         return f"""
 {chart}
-{breakdown}
+
 **Data Source:** PIN.ITEM_T
-**Total Transactions:** {total}
+**Insight:** Operational revenue composition.
 """
 
     # ==========================================================================
@@ -192,7 +215,7 @@ class TerminalCharts:
         
         plt.clear_figure()
         plt.scatter(arpu_values, overdue_values, marker="dot")
-        plt.title("🔥 Overdue Balance vs ARPU (High-Risk Identification)")
+        plt.title("Overdue Balance vs ARPU (High-Risk Identification)")
         plt.xlabel("ARPU (Average Revenue)")
         plt.ylabel("Overdue Balance")
         plt.plotsize(60, 15)
@@ -245,7 +268,7 @@ class TerminalCharts:
         
         plt.clear_figure()
         plt.bar(hours, counts, width=0.8)
-        plt.title("📊 Service Usage Intensity by Hour")
+        plt.title("Service Usage Intensity by Hour")
         plt.xlabel("Hour of Day")
         plt.ylabel("Event Count")
         plt.plotsize(60, 12)
@@ -293,7 +316,7 @@ class TerminalCharts:
         plt.simple_multiple_bar(
             regions, 
             [totals, at_risk],
-            title="🔥 Churn Risk by Region",
+            title="Churn Risk by Region",
             width=60,
             labels=["Total", "At-Risk"]
         )
@@ -345,7 +368,7 @@ class TerminalCharts:
         
         plt.clear_figure()
         plt.scatter(arpu_values, churn_prob, marker="dot")
-        plt.title("📈 ARPU vs Churn Probability")
+        plt.title("ARPU vs Churn Probability")
         plt.xlabel("ARPU (Average Revenue)")
         plt.ylabel("Churn Probability")
         plt.plotsize(60, 15)
@@ -402,7 +425,7 @@ class TerminalCharts:
         plt.simple_multiple_bar(
             regions,
             [customers, adjustments],
-            title="📊 Complaints/Adjustments by Region",
+            title="Complaints/Adjustments by Region",
             width=60,
             labels=["Customers", "Adjustments"]
         )
@@ -442,7 +465,7 @@ class TerminalCharts:
         
         plt.clear_figure()
         plt.plot(customers, marker="braille")
-        plt.title("📈 Customer Acquisition Trend")
+        plt.title("Customer Acquisition Trend")
         plt.xlabel("Time Period")
         plt.ylabel("New Customers")
         plt.xticks(range(len(months)), months)
@@ -481,7 +504,7 @@ class TerminalCharts:
         
         plt.clear_figure()
         plt.plot(revenue, marker="braille")
-        plt.title("📈 Monthly Revenue Growth")
+        plt.title("Monthly Revenue Growth")
         plt.xlabel("Time Period")
         plt.ylabel("Revenue")
         plt.xticks(range(len(months)), months)

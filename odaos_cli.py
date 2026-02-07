@@ -12,6 +12,20 @@ import sys
 import os
 from pathlib import Path
 from datetime import datetime
+import logging
+
+# ============================================================================
+# Silence Noisy Logs
+# ============================================================================
+# Suppress INFO logs from external libraries and internal modules for a cleaner CLI
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("oci").setLevel(logging.WARNING)
+logging.getLogger("src.database.connection").setLevel(logging.WARNING)
+logging.getLogger("src.orchestrator").setLevel(logging.WARNING)
+logging.getLogger("src.agents").setLevel(logging.WARNING)
+logging.getLogger("langchain").setLevel(logging.WARNING)
+logging.getLogger("langgraph").setLevel(logging.WARNING)
 
 # Set UTF-8 encoding for Windows (needed for terminal charts)
 if sys.platform == "win32":
@@ -96,19 +110,42 @@ class ODAOSCLI:
         self.analytics_mode = False
     
     async def initialize(self):
-        """Initialize the orchestrator."""
+        """Initialize the orchestrator and display connection status."""
         console.print("\n[dim]Initializing ODAOS components...[/dim]")
         
         from src.orchestrator import ODAOSOrchestrator
         from src.agents.analytics import AnalyticsAgent
+        from src.database.connection import get_connection_manager
         
+        # Initialize orchestrator
         self.orchestrator = ODAOSOrchestrator()
         self.orchestrator.new_conversation(self.conversation_id)
         
         # Initialize analytics agent
         self.analytics_agent = AnalyticsAgent()
         
-        console.print("[green]Ready![/green]\n")
+        # Get database connection info for formatted display
+        manager = get_connection_manager()
+        try:
+            db_status = await manager.test_connection()
+            if db_status.get("connected"):
+                info = db_status["database_info"]
+                conn_text = Text()
+                conn_text.append("✅ Connected to Oracle Database\n", style="bold green")
+                conn_text.append(f"• Instance: ", style="dim")
+                conn_text.append(f"{info.get('INSTANCE_NAME', 'Unknown')}\n", style="cyan")
+                conn_text.append(f"• Host:     ", style="dim")
+                conn_text.append(f"{info.get('HOST_NAME', 'Unknown')}\n", style="cyan")
+                conn_text.append(f"• Version:  ", style="dim")
+                conn_text.append(f"{info.get('VERSION', 'Unknown').splitlines()[0]}", style="cyan")
+                
+                console.print(Panel(conn_text, title="[bold blue]Connection Status[/bold blue]", border_style="blue", expand=False))
+            else:
+                console.print(Panel(f"[red]❌ Database Connection Failed[/red]\n[dim]{db_status.get('error')}[/dim]", title="Error", border_style="red"))
+        except Exception as e:
+            console.print(f"[red]Error checking database connection: {e}[/red]")
+            
+        console.print("[green]System Ready![/green]\n")
 
     
     async def process_command(self, user_input: str) -> str:
@@ -142,23 +179,69 @@ class ODAOSCLI:
             self.analytics_mode = True
             return """**📊 Analytics Mode Activated!**
 
-**Ask anything in your own words** - the AI understands natural language!
+**Ask anything in natural language** - the AI interprets your intent!
 
-Examples (but feel free to phrase differently):
+---
 
-🥧 **Pie Charts** - Customer regions, product share, service revenue
-🔥 **Heatmaps** - Overdue vs ARPU, usage by time, churn risk, complaints
-📈 **Scatter Plots** - ARPU vs churn probability
-📉 **Line Charts** - Acquisition trends, revenue growth
+## 🎯 CUSTOMER INSIGHTS
 
-**Sample ways to ask:**
-- "Show me where our customers are located"
+**Geographic Distribution** (Pie/Bar Chart)
+- "Show customer distribution by region"
+- "Which countries have the most customers?"
+- "Create a pie chart of customers by country"
+
+**Product Adoption** (Pie/Bar Chart)
+- "What's our product market share?"
 - "Which products are selling best?"
-- "Who are our high-risk customers?"
-- "How has revenue changed over time?"
-- "Compare complaints across regions"
+- "Show subscription breakdown by product"
 
-The AI interprets your intent - no fixed phrasing required!
+---
+
+## 💰 REVENUE ANALYSIS
+
+**Revenue Composition** (Pie/Bar Chart)
+- "How is our revenue distributed by service type?"
+- "Which services generate the most revenue?"
+
+**Revenue Trends** (Line Chart)
+- "Show monthly revenue growth"
+- "How has revenue changed over time?"
+
+**Customer Acquisition** (Line Chart)
+- "Show customer acquisition trends"
+- "How many new customers each month?"
+
+---
+
+## ⚠️ RISK MANAGEMENT
+
+**High-Value At-Risk Customers** (Scatter Plot)
+- "Plot ARPU vs churn probability"
+- "Who are our high-value customers at risk?"
+
+**Payment Risk** (Heatmap)
+- "Create a heatmap of overdue balance vs ARPU"
+- "Who are our high-risk non-payment customers?"
+
+**Churn by Region** (Heatmap)
+- "Visualize churn risk by region"
+- "Where are we losing the most customers?"
+
+---
+
+## 📈 OPERATIONAL INTELLIGENCE
+
+**Service Usage Patterns** (Heatmap)
+- "Show usage intensity by time of day"
+- "When are our peak usage hours?"
+
+**Complaints & Errors** (Heatmap)
+- "Compare complaints vs billing errors by region"
+- "Which regions have the most adjustments?"
+
+---
+
+**💡 Tips:** Say "as a pie chart" or "as a bar chart" to change style.
 
 Type `/back` to return to normal mode."""
         
@@ -229,8 +312,12 @@ Type `/back` to return to normal mode."""
                     title = "[bold green]ODAOS[/bold green]"
                     border = "green"
                 
+                # Smart rendering: Use Markdown for results with code blocks (charts).
+                # Otherwise, print as raw text to prevent mangling ASCII art/special chars.
+                renderable = Markdown(response) if "```" in response else response
+                
                 console.print(Panel(
-                    Markdown(response),
+                    renderable,
                     title=title,
                     border_style=border
                 ))

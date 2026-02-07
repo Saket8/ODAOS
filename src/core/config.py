@@ -18,6 +18,7 @@ class LLMProvider(str, Enum):
     OLLAMA = "ollama"
     ANTHROPIC = "anthropic"
     GEMINI = "gemini"
+    OPENROUTER = "openrouter"
 
 
 class Settings(BaseSettings):
@@ -58,6 +59,16 @@ class Settings(BaseSettings):
     gemini_model: str = Field(
         default="gemini-2.0-flash",
         description="Gemini model name"
+    )
+    
+    # OpenRouter Settings
+    openrouter_api_key: Optional[SecretStr] = Field(
+        default=None,
+        description="OpenRouter API key"
+    )
+    openrouter_model: str = Field(
+        default="deepseek/deepseek-chat",
+        description="OpenRouter model name"
     )
     
     # Ollama Settings (for local development)
@@ -146,6 +157,8 @@ class Settings(BaseSettings):
             return self.anthropic_model
         elif self.odaos_llm_provider == LLMProvider.GEMINI:
             return self.gemini_model
+        elif self.odaos_llm_provider == LLMProvider.OPENROUTER:
+            return self.openrouter_model
         raise ValueError(f"Unknown provider: {self.odaos_llm_provider}")
 
 
