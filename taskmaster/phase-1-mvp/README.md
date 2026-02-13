@@ -23,8 +23,9 @@ Build a fully functional ODAOS MVP on local development environment with all 3 A
 | 1.11 | User Acceptance Testing | 4-6h | 1.10 | ✅ |
 | 1.12 | Documentation & Code Refinement | 4-6h | 1.11 | ✅ |
 | **1.13** | **BRM Analytics & Visualization** | 6-8h | 1.2, 1.9 | ✅ |
+| **1.14** | **Premium Web Dashboard (Conversational AI + Smart Viz)** | 60-70h | 1.9, 1.13 | 🔲 |
 
-**Total: ~70-90 hours**
+**Total: ~130-160 hours**
 
 ## Task Dependency Graph
 
@@ -53,7 +54,10 @@ Build a fully functional ODAOS MVP on local development environment with all 3 A
                                                       │
                                                       ├──→ 1.12 Documentation
                                                       │
-                                                      └──→ 1.13 Analytics & Visualization ✨ NEW
+                                                      └──→ 1.13 Analytics ✅
+                                                                │
+                                                                ▼
+                                                      1.14 Web Dashboard (MVP) 🔲 NEW
 ```
 
 ## MVP Success Criteria

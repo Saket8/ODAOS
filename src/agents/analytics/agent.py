@@ -346,6 +346,14 @@ class AnalyticsAgent:
         )
         
         self.thread_id = f"analytics-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        self._data_service = None
+    
+    async def _get_data_service(self):
+        """Get DataService instance."""
+        if self._data_service is None:
+            from src.api.services.data_service import get_data_service
+            self._data_service = get_data_service()
+        return self._data_service
     
     async def chat(
         self, 
@@ -371,6 +379,223 @@ class AnalyticsAgent:
         except Exception as e:
             return f"Error: {str(e)}"
     
+    async def get_viz_data(self, query: str, preferred_chart_type: str = "auto", thread_id: Optional[str] = None) -> dict:
+        """
+        Return structured chart data for web (Plotly) rendering.
+        
+        Uses LLM-powered query understanding to determine:
+        1. What data to fetch (customer, revenue, product, etc.)
+        2. What chart type to use (pie, bar, line, etc.)
+        3. Appropriate title and narrative
+        
+        Args:
+            query: Natural language query from user
+            preferred_chart_type: Override chart type if specified
+            thread_id: Thread ID for conversation context
+        
+        Returns:
+            Dict with: chart_type, title, data, narrative, data_source
+        """
+        config = {"configurable": {"thread_id": thread_id or self.thread_id}}
+        
+        # Determine data type and chart type using LLM to handle context (e.g. "same data")
+        intent = await self._detect_intent_with_llm(query, config)
+        
+        data_type = intent.get("data_type", "customer_region")
+        chart_type = preferred_chart_type if preferred_chart_type != "auto" else intent.get("chart_type", "auto")
+        
+        # Fetch data from DataService
+        data_service = await self._get_data_service()
+        result = await data_service.get_data_for_query(data_type)
+        
+        # Final chart type selection
+        final_chart_type = chart_type if chart_type != "auto" else result.suggested_chart_type
+        
+        # Generate narrative from data
+        narrative = self._generate_data_narrative(result.data, result.title)
+        
+        return {
+            "chart_type": final_chart_type,
+            "title": result.title,
+            "data": result.data,
+            "data_source": result.data_source,
+            "insight": result.insight,
+            "narrative": narrative,
+            "x_axis_label": result.x_axis_label,
+            "y_axis_label": result.y_axis_label
+        }
+
+    async def _detect_intent_with_llm(self, query: str, config: dict) -> dict:
+        """Use LLM to detect data_type and chart_type from query and context."""
+        system_msg = """Identify the user's visualization intent. 
+        Available data_types: 
+        - 'customer_region' (regional distribution)
+        - 'revenue_trends' (monthly metrics)
+        - 'revenue_service' (service breakdown)
+        - 'product_share' (product popularity)
+        - 'usage_time' (temporal activity)
+        - 'churn_region' (geographic risk)
+        - 'arpu_churn' (correlation between revenue and risk)
+        - 'complaints' (service issues)
+
+        Available chart_types: 'pie', 'bar', 'line', 'scatter', 'heatmap', 'auto'.
+
+        CRITICAL DIRECTION:
+        1. If the query starts with 'show me', 'what is', or mentions a specific metric (revenue, churn, arpu), PRIORITIZE the current query over previous context.
+        2. ONLY use previous context if the user says 'same data', 'that one', 'as well', or 'how about [chart_type]'.
+        3. 'ARPU vs Churn' or 'Correlation' MUST return 'arpu_churn' and 'scatter'.
+
+        Return ONLY a JSON object: {"data_type": "...", "chart_type": "..."}"""
+
+        try:
+            # We'll read history but let the LLM decide priority
+            history = []
+            if self.memory:
+                state = await self.agent.aget_state(config)
+                if state and "messages" in state.values:
+                    # Get last 3 messages for context (don't over-context)
+                    history = state.values["messages"][-3:]
+            
+            messages = [SystemMessage(content=system_msg)]
+            if history:
+                messages.extend(history)
+            
+            # Ensure the current query is the last human message
+            if not history or history[-1].content != query:
+                messages.append(HumanMessage(content=query))
+            
+            print(f"[AnalyticsAgent] Detecting intent for: {query}")
+            response = await self.llm.ainvoke(messages)
+            content = response.content.strip()
+            
+            # Basic cleanup of LLM output
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            
+            import json
+            import re
+            
+            # Extract JSON from response
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                intent = json.loads(json_match.group(0))
+                print(f"[AnalyticsAgent] Detected intent: {intent}")
+                return intent
+            
+            # Fallback to key-word matching
+            fallback = {
+                "data_type": self._detect_data_type(query.lower()),
+                "chart_type": self._detect_chart_type(query.lower(), "auto")
+            }
+            print(f"[AnalyticsAgent] Fallback intent: {fallback}")
+            return fallback
+        except Exception as e:
+            print(f"[AnalyticsAgent] Intent detection failed: {e}")
+            return {"data_type": self._detect_data_type(query.lower()), "chart_type": "auto"}
+
+    def _detect_data_type(self, query: str) -> str:
+        """Fallback keyword-based data type detection."""
+        q = query.lower()
+        if any(word in q for word in ["customer", "region", "country", "distribution"]): return "customer_region"
+        if any(word in q for word in ["revenue trend", "growth", "monthly"]): return "revenue_trends"
+        if any(word in q for word in ["revenue by service", "service revenue"]): return "revenue_service"
+        if any(word in q for word in ["product", "market share", "subscription"]): return "product_share"
+        if any(word in q for word in ["usage", "time of day", "peak"]): return "usage_time"
+        if any(word in q for word in ["churn", "risk", "inactive"]):
+            if any(word in q for word in ["arpu", "scatter", "scatter plot", "correlation"]): return "arpu_churn"
+            return "churn_region"
+        if any(word in q for word in ["arpu", "scatter"]): return "arpu_churn"
+        if any(word in q for word in ["complaint", "adjustment", "error", "issue"]): return "complaints"
+        return "customer_region"
+
+    def _detect_chart_type(self, query: str, preferred: str) -> str:
+        """Fallback keyword-based chart type detection."""
+        if preferred != "auto": return preferred
+        q = query.lower()
+        if "pie" in q: return "pie"
+        if "bar" in q: return "bar"
+        if "line" in q: return "line"
+        if "scatter" in q: return "scatter"
+        if "heatmap" in q: return "heatmap"
+        return "auto"
+    
+    def _generate_data_narrative(self, data: list, title: str) -> dict:
+        """Generate narrative insights from data."""
+        if not data:
+            return {
+                "summary": f"No data available for {title}.",
+                "key_insights": ["Database returned zero records."],
+                "recommendations": ["Check if the data range exists in the current environment."]
+            }
+        
+        # Calculate stats for standard charts
+        values = [d.get('value', d.get('y', 0)) for d in data]
+        total = sum(values)
+        
+        # Handle all-zero case
+        if total == 0 and len(data) > 0:
+            return {
+                "summary": f"Data retrieved for {title.lower()} is currently at baseline (zero).",
+                "key_insights": [
+                    "All monitored segments are showing zero activity.",
+                    f"Sampled {len(data)} segments with no variance."
+                ],
+                "recommendations": [
+                    "Verify if event processing is active.",
+                    "Review filter criteria for potential over-restriction."
+                ]
+            }
+            
+        max_val = max(values) if values else 0
+        max_idx = values.index(max_val) if values else 0
+        top_label = data[max_idx].get('label') or data[max_idx].get('month', 'Top segment')
+        top_pct = (max_val / total * 100) if total > 0 else 0
+        
+        return {
+            "summary": f"Analysis of {title.lower()} from live Oracle BRM database.",
+            "key_insights": [
+                f"{top_label} leads with {top_pct:.1f}% ({max_val:,.0f} total)" if total > 0 else "Baseline data detected",
+                f"Total aggregated value: {total:,.0f}",
+                f"Dataset contains {len(data)} distinct data points"
+            ],
+            "recommendations": [
+                f"Prioritize resources for {top_label}" if total > 0 else "Verify data ingestion pipelines",
+                "Monitor for further variance over coming periods"
+            ]
+        }
+        
+        # Handle all-zero case
+        if total == 0 and len(data) > 0:
+            return {
+                "summary": f"Data retrieved for {title.lower()} is currently at baseline (zero).",
+                "key_insights": [
+                    "All monitored segments are showing zero activity.",
+                    f"Sampled {len(data)} segments with no variance."
+                ],
+                "recommendations": [
+                    "Verify if event processing is active.",
+                    "Review filter criteria for potential over-restriction."
+                ]
+            }
+            
+        max_val = max(values) if values else 0
+        max_idx = values.index(max_val) if values else 0
+        top_label = data[max_idx].get('label') or data[max_idx].get('month', 'Top segment')
+        top_pct = (max_val / total * 100) if total > 0 else 0
+        
+        return {
+            "summary": f"Analysis of {title.lower()} from live Oracle BRM database.",
+            "key_insights": [
+                f"{top_label} leads with {top_pct:.1f}% ({max_val:,.0f} total)" if total > 0 else "Baseline data detected",
+                f"Total aggregated value: {total:,.0f}",
+                f"Dataset contains {len(data)} distinct data points"
+            ],
+            "recommendations": [
+                f"Prioritize resources for {top_label}" if total > 0 else "Verify data ingestion pipelines",
+                "Monitor for further variance over coming periods"
+            ]
+        }
+    
     def chat_sync(self, message: str, thread_id: Optional[str] = None) -> str:
         """Synchronous version of chat."""
         return asyncio.run(self.chat(message, thread_id))
@@ -386,3 +611,5 @@ if __name__ == "__main__":
         agent = AnalyticsAgent()
         print(await agent.chat("What analytics are available?"))
     asyncio.run(test())
+
+

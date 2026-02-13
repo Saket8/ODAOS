@@ -21,8 +21,9 @@ Deploy MVP to production OKE environment with full containerization, high availa
 | 2.4 | Production Deployment | 4-6h | 2.3 |
 | 2.5 | Production Validation & Testing | 4-6h | 2.4 |
 | 2.6 | Documentation & Handoff | 6-8h | 2.5 |
+| **2.7** | **Premium Dashboard (Voice, Collab, Predictive, Gamification)** | 80-100h | 1.14, 2.4 |
 
-**Total: ~30-42 hours**
+**Total: ~110-142 hours**
 
 ## Task Dependency Graph
 
