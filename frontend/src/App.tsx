@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
-import { Moon, Sun, PanelLeftClose, PanelLeft, Settings, X } from 'lucide-react'
+import { Moon, Sun, PanelLeft, Settings, X, BookOpen } from 'lucide-react'
 import ChatContainer from './components/Chat/ChatContainer'
 import Sidebar from './components/Layout/Sidebar'
+import LoginGate from './components/PromptLibrary/LoginGate'
+import PromptLibraryView from './components/PromptLibrary/PromptLibraryView'
 
-function App() {
+function AppShell() {
   const [darkMode, setDarkMode] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     if (darkMode) {
@@ -17,6 +22,19 @@ function App() {
       document.documentElement.classList.remove('dark')
     }
   }, [darkMode])
+
+  // If on prompt library route, render the prompt library view
+  if (location.pathname.startsWith('/prompt-library')) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-200">
+        <div className="h-screen">
+          <LoginGate>
+            <PromptLibraryView />
+          </LoginGate>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-200">
@@ -56,6 +74,13 @@ function App() {
             </div>
 
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => navigate('/prompt-library')}
+                className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors group"
+                title="Prompt Library"
+              >
+                <BookOpen size={16} className="text-[var(--text-secondary)] group-hover:text-[var(--accent-primary)]" />
+              </button>
               <button
                 onClick={() => setDarkMode(!darkMode)}
                 className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
@@ -138,6 +163,17 @@ function App() {
                   </p>
                 </div>
 
+                {/* Prompt Library */}
+                <div
+                  onClick={() => { setSettingsOpen(false); navigate('/prompt-library') }}
+                  className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <BookOpen size={14} /> Prompt Library
+                  </span>
+                  <span className="text-xs text-[var(--accent-primary)]">Open →</span>
+                </div>
+
                 {/* Version */}
                 <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)]">
                   <span className="text-sm font-medium">Version</span>
@@ -149,6 +185,14 @@ function App() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/*" element={<AppShell />} />
+    </Routes>
   )
 }
 

@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 
-from src.api.routes import chat, viz, sessions, health
+from src.api.routes import chat, viz, sessions, health, prompts
+from src.api.middleware.auth import router as auth_router
 
 
 @asynccontextmanager
@@ -39,6 +40,8 @@ app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 app.include_router(viz.router, prefix="/api/viz", tags=["Visualizations"])
 app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
+app.include_router(prompts.router, prefix="/api/prompts", tags=["Prompts"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 
 
 @app.get("/")

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, MessageSquare, Trash2, PanelLeftClose } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Search, MessageSquare, Trash2, PanelLeftClose, BookOpen } from 'lucide-react'
 
 const API_BASE = 'http://localhost:8000'
 
@@ -19,6 +20,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ currentSessionId, onSessionSelect, onNewSession, onClose }: SidebarProps) {
+    const navigate = useNavigate()
     const [sessions, setSessions] = useState<Session[]>([])
     const [search, setSearch] = useState('')
     const [loading, setLoading] = useState(true)
@@ -114,8 +116,8 @@ export default function Sidebar({ currentSessionId, onSessionSelect, onNewSessio
                                 key={session.id}
                                 onClick={() => onSessionSelect(session.id)}
                                 className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors text-sm ${session.id === currentSessionId
-                                        ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]'
-                                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                                    ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]'
+                                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                                     }`}
                             >
                                 <MessageSquare size={14} className="flex-shrink-0 opacity-50" />
@@ -133,8 +135,15 @@ export default function Sidebar({ currentSessionId, onSessionSelect, onNewSessio
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t border-[var(--border-subtle)]">
-                <div className="text-[11px] text-[var(--text-muted)] text-center">
+            <div className="p-2 border-t border-[var(--border-subtle)] space-y-1">
+                <button
+                    onClick={() => navigate('/prompt-library')}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-primary)] transition-colors"
+                >
+                    <BookOpen size={14} />
+                    <span>Prompt Library</span>
+                </button>
+                <div className="text-[11px] text-[var(--text-muted)] text-center pt-1">
                     {sessions.length} conversation{sessions.length !== 1 ? 's' : ''}
                 </div>
             </div>

@@ -19,10 +19,31 @@ from src.api.models.session import (
     SessionCreate,
     SessionList
 )
+from src.api.models.prompt import (
+    Prompt,
+    PromptSummary,
+    PromptCategory,
+    PromptParameter,
+    PromptExecuteRequest,
+    PromptExecuteResponse,
+    PromptFavorite,
+    PromptHistoryEntry,
+    PromptCreate,
+    PromptUpdate,
+    PromptListResponse,
+    FavoriteToggleResponse,
+    PromptHistoryResponse
+)
 
 __all__ = [
     "ChatMessage", "ChatRequest", "ChatResponse", "StreamEvent",
     "QuickReply", "InsightCard",
     "VizRequest", "VizResponse", "ChartData", "SmartNarrative",
-    "Session", "SessionCreate", "SessionList"
+    "Session", "SessionCreate", "SessionList",
+    "Prompt", "PromptSummary", "PromptCategory", "PromptParameter",
+    "PromptExecuteRequest", "PromptExecuteResponse",
+    "PromptFavorite", "PromptHistoryEntry",
+    "PromptCreate", "PromptUpdate", "PromptListResponse",
+    "FavoriteToggleResponse", "PromptHistoryResponse",
 ]
+

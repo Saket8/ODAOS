@@ -1,8 +1,6 @@
 @import "tailwindcss";
 
-/* ===== MODERN CHAT UI THEME (Claude/ChatGPT-inspired) ===== */
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* ===== MODERN CHAT UI THEME (ChatGPT-inspired) ===== */
 
 :root {
   /* Light mode */
@@ -68,7 +66,7 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: ui-sans-serif, -apple-system, system-ui, 'Segoe UI', Roboto, Ubuntu, Cantarell, 'Noto Sans', sans-serif, 'Helvetica Neue', Arial;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   transition: background-color 0.2s ease, color 0.2s ease;
