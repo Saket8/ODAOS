@@ -1,0 +1,70 @@
+[
+  {
+    "title": "Test Prompt",
+    "template": "Show test for {param1}"
+  },
+  {
+    "title": "Test Prompt",
+    "template": "Show test for {param1}"
+  },
+  {
+    "title": "Monthly Revenue Trend",
+    "template": "Show the monthly revenue trend for the last {months} months. Include month-over-month growth percentages and highlight any significant changes.\n\nProvide a structured analysis:\n1. DATA TABLE: Present the data in a markdown table with columns: Month, Revenue, MoM Growth %, Trend\n2. TREND ANALYSIS: Describe overall direction, seasonality patterns, and growth/decline periods\n3. KEY INSIGHTS: List 3-5 bullet points highlighting notable findings\n4. RECOMMENDATIONS: Suggest 2-3 actionable items based on the trends"
+  },
+  {
+    "title": "Revenue by Product Category",
+    "template": "Show revenue breakdown by product category for {quarter} {year}. Include percentages and compare with the previous quarter.\n\nProvide a structured analysis:\n1. DATA TABLE: Category, Revenue, % Share, QoQ Change\n2. ANALYSIS: Which categories are growing/declining and why\n3. KEY INSIGHTS: Top 3-5 findings about category performance\n4. RECOMMENDATIONS: Focus areas and potential opportunities"
+  },
+  {
+    "title": "Top Revenue Generating Accounts",
+    "template": "List the top {count} revenue-generating accounts. Show their total revenue, product mix, and growth trend for the last {months} months.\n\nProvide a structured analysis:\n1. DATA TABLE: Rank, Account, Total Revenue, Primary Products, Growth Rate\n2. CONCENTRATION ANALYSIS: Revenue concentration risk (top 5, top 10 share)\n3. KEY INSIGHTS: Account-level patterns and risks\n4. RECOMMENDATIONS: Retention strategies for top accounts"
+  },
+  {
+    "title": "Revenue Leakage Detection",
+    "template": "Analyze billing data for potential revenue leakage. Check for unbilled CDRs, rating mismatches, and service-charge discrepancies over the last {days} days.\n\nProvide a structured analysis:\n1. DATA TABLE: Leakage Type, Affected Records, Estimated Revenue Impact\n2. ROOT CAUSE: Identify patterns or systemic issues causing each leakage type\n3. KEY INSIGHTS: Severity ranking and business impact\n4. RECOMMENDATIONS: Remediation steps prioritized by financial impact"
+  },
+  {
+    "title": "Customer Distribution by Region",
+    "template": "Show customer distribution by region. Include total counts, percentage share, and growth rate for each region.\n\nProvide a structured analysis:\n1. DATA TABLE: Region, Customer Count, % Share, YoY Growth\n2. GEOGRAPHIC ANALYSIS: Distribution patterns and regional strengths\n3. KEY INSIGHTS: Underserved regions with growth potential\n4. RECOMMENDATIONS: Market expansion priorities"
+  },
+  {
+    "title": "Customer Churn Analysis",
+    "template": "Analyze customer churn over the last {months} months. Show churn rate trend, top {count} reasons for churn, and identify currently at-risk accounts.\n\nProvide a structured analysis:\n1. DATA TABLE: Month, Churned Customers, Churn Rate %, Revenue Lost\n2. CHURN REASON ANALYSIS: Top reasons ranked by frequency and revenue impact\n3. AT-RISK LIST: Currently at-risk accounts with risk indicators\n4. RECOMMENDATIONS: Targeted retention strategies per churn reason"
+  },
+  {
+    "title": "New Customer Acquisition Trend",
+    "template": "Show new customer acquisitions over the last {months} months. Break down by acquisition channel and compare with targets.\n\nProvide a structured analysis:\n1. DATA TABLE: Month, New Customers, Channel Breakdown, vs Target %\n2. CHANNEL ANALYSIS: Cost per acquisition and conversion rates by channel\n3. KEY INSIGHTS: Most effective channels and seasonal patterns\n4. RECOMMENDATIONS: Budget allocation adjustments"
+  },
+  {
+    "title": "Customer Segmentation Analysis",
+    "template": "Perform customer segmentation based on ARPU, tenure, and product usage. Identify the top {count} segments with their characteristics.\n\nProvide a structured analysis:\n1. DATA TABLE: Segment, Size, Avg ARPU, Avg Tenure, Primary Products, Growth Trend\n2. SEGMENT PROFILES: Detailed characteristics and behavior patterns per segment\n3. KEY INSIGHTS: Highest-value segments and underserved opportunities\n4. RECOMMENDATIONS: Targeted strategies per segment"
+  },
+  {
+    "title": "Overdue Payment Analysis",
+    "template": "Show overdue payment analysis. Include aging buckets (30/60/90/120+ days), total overdue amount, and top {count} overdue accounts.\n\nProvide a structured analysis:\n1. DATA TABLE: Aging Bucket, Count, Total Amount, % of Total\n2. ACCOUNT LIST: Top overdue accounts with amount, days overdue, contact history\n3. KEY INSIGHTS: Trends in overdue patterns and collection effectiveness\n4. RECOMMENDATIONS: Priority collection actions and process improvements"
+  },
+  {
+    "title": "Payment Method Distribution",
+    "template": "Show payment method distribution for the last {months} months. Include volume, value, success rate, and failure reasons per method.\n\nProvide a structured analysis:\n1. DATA TABLE: Method, Volume, Total Value, Success Rate %, Top Failure Reason\n2. TREND ANALYSIS: Shifts in payment method preference over time\n3. KEY INSIGHTS: Methods with low success rates requiring attention\n4. RECOMMENDATIONS: Steps to improve success rates and encourage preferred methods"
+  },
+  {
+    "title": "Failed Payment Root Cause",
+    "template": "Analyze failed payments over the last {days} days. Group by failure reason, identify trends, and flag any systemic issues.\n\nProvide a structured analysis:\n1. DATA TABLE: Failure Reason, Count, Total Value, Trend (Up/Down/Stable)\n2. PATTERN ANALYSIS: Time-based patterns (day/hour), customer segments affected\n3. KEY INSIGHTS: Systemic issues vs. one-off failures\n4. RECOMMENDATIONS: Technical fixes and process changes to reduce failures"
+  },
+  {
+    "title": "Payment Reconciliation Report",
+    "template": "Run payment reconciliation for the last {days} days. Identify unmatched payments, overpayments, underpayments, and unapplied credits.\n\nProvide a structured analysis:\n1. DATA TABLE: Category (Unmatched/Over/Under/Unapplied), Count, Total Amount\n2. DETAIL LIST: Top mismatches with payment and invoice references\n3. KEY INSIGHTS: Common mismatch patterns and root causes\n4. RECOMMENDATIONS: Process improvements and system configuration changes"
+  },
+  {
+    "title": "Bill Cycle Status",
+    "template": "Show the status of billing cycles for the last {count} cycles. Include success rate, error counts, processing time, and any stuck jobs.\n\nProvide a structured analysis:\n1. DATA TABLE: Cycle, Start/End Time, Records Processed, Success Rate, Errors, Duration\n2. TREND ANALYSIS: Processing time and error rate trends across cycles\n3. KEY INSIGHTS: Recurring issues and performance bottlenecks\n4. RECOMMENDATIONS: Optimizations for faster and more reliable bill runs"
+  },
+  {
+    "title": "Service Provisioning Queue",
+    "template": "Show the current service provisioning queue status. Include pending, in-progress, completed, and failed counts for the last {hours} hours.\n\nProvide a structured analysis:\n1. DATA TABLE: Status (Pending/In-Progress/Completed/Failed), Count, Avg Age, Oldest Order\n2. FAILURE ANALYSIS: Top reasons for failed provisioning orders\n3. KEY INSIGHTS: Queue health and throughput capacity\n4. RECOMMENDATIONS: Bottleneck resolution and capacity planning"
+  },
+  {
+    "title": "Rating Engine Performance",
+    "template": "Show rating engine performance metrics for the last {days} days. Include throughput (events/sec), average latency, error rate, and peak loads.\n\nProvide a structured analysis:\n1. DATA TABLE: Date, Avg Throughput, Peak Throughput, Avg Latency, Error Rate %\n2. PATTERN ANALYSIS: Peak usage patterns, latency spikes, error correlation\n3. KEY INSIGHTS: Capacity utilization and performance trends\n4. RECOMMENDATIONS: Scaling recommendations and performance tuning"
+  }
+]

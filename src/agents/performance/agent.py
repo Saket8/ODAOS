@@ -25,6 +25,12 @@ from ...mcp_servers.performance.server import (
     get_database_metrics_handler,
     analyze_top_sql_handler,
     check_tablespace_usage_handler,
+    get_ash_data_handler,
+    get_io_performance_handler,
+    get_instance_parameters_handler,
+    get_database_uptime_handler,
+    get_segment_sizes_handler,
+    get_temp_usage_handler,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,6 +61,12 @@ Available Tools:
 - get_database_metrics: Get CPU, memory, session, and I/O statistics
 - analyze_top_sql: Find resource-intensive SQL statements with recommendations
 - check_tablespace_usage: Check tablespace utilization and alerts
+- get_ash_data: Get Active Session History (ASH) for wait events and session activity
+- get_io_performance: Get per-datafile I/O latency and identify storage hotspots
+- get_instance_parameters: Review non-default instance parameters
+- get_database_uptime: Check database uptime and startup time
+- get_segment_sizes: Identify the largest space-consuming segments (tables/indexes)
+- get_temp_usage: Check TEMP tablespace usage and top consuming sessions
 
 When asked about database health, systematically check all relevant metrics.
 When asked about specific issues, focus on the relevant tools.
@@ -110,8 +122,81 @@ async def check_tablespace_usage(threshold: int = 85) -> str:
     return json.dumps(result, indent=2, default=str)
 
 
+@tool
+async def get_ash_data(minutes: int = 30) -> str:
+    """Get Active Session History (ASH) data including top wait events, 
+    top SQL statements consuming database time, and session activity breakdown.
+    
+    Args:
+        minutes: Number of minutes to look back (default 30)
+    """
+    import json
+    result = await get_ash_data_handler(minutes)
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_io_performance() -> str:
+    """Get I/O performance statistics per datafile, including read/write 
+    latency and throughput. Identifies I/O hotspots."""
+    import json
+    result = await get_io_performance_handler()
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_instance_parameters(modified_only: bool = True) -> str:
+    """Get current Oracle instance parameters.
+    
+    Args:
+        modified_only: If true, only show parameters modified from default
+    """
+    import json
+    result = await get_instance_parameters_handler(modified_only)
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_database_uptime() -> str:
+    """Get database uptime, startup time, and general availability status."""
+    import json
+    result = await get_database_uptime_handler()
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_segment_sizes(top_n: int = 20) -> str:
+    """Get the largest database segments (tables, indexes, LOBs) to analyze 
+    space consumption.
+    
+    Args:
+        top_n: Number of segments to return
+    """
+    import json
+    result = await get_segment_sizes_handler(top_n)
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_temp_usage() -> str:
+    """Get TEMP tablespace usage and the sessions consuming the most temporary space."""
+    import json
+    result = await get_temp_usage_handler()
+    return json.dumps(result, indent=2, default=str)
+
+
 # All available tools
-PERFORMANCE_TOOLS = [get_database_metrics, analyze_top_sql, check_tablespace_usage]
+PERFORMANCE_TOOLS = [
+    get_database_metrics, 
+    analyze_top_sql, 
+    check_tablespace_usage,
+    get_ash_data,
+    get_io_performance,
+    get_instance_parameters,
+    get_database_uptime,
+    get_segment_sizes,
+    get_temp_usage,
+]
 
 
 # ============================================================================

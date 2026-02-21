@@ -27,6 +27,11 @@ from ...mcp_servers.self_healing.server import (
     get_tablespace_status_handler,
     extend_tablespace_handler,
     kill_session_handler,
+    get_long_running_sessions_handler,
+    get_user_privileges_handler,
+    get_rman_backup_status_handler,
+    get_archive_log_rate_handler,
+    get_flash_recovery_area_handler,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,6 +75,11 @@ Available Tools:
 - get_tablespace_status: Check space usage and predictions
 - extend_tablespace: Generate DDL to add space (approval required)
 - kill_session: Generate command to terminate session (approval required)
+- get_long_running_sessions: Find sessions exceeding execution time threshold
+- get_user_privileges: Audit system privileges and roles for a specific user
+- get_rman_backup_status: Check recent RMAN backup jobs (success/failure)
+- get_archive_log_rate: Analyze daily archive log generation rate in GB
+- get_flash_recovery_area: Check FRA space utilization and components
 """
 
 
@@ -152,6 +162,62 @@ async def kill_session(sid: int, serial: int, immediate: bool = False) -> str:
     return json.dumps(result, indent=2, default=str)
 
 
+@tool
+async def get_long_running_sessions(minutes_threshold: int = 60) -> str:
+    """Find long running user sessions in the database that exceed a specified execution threshold.
+    
+    Args:
+        minutes_threshold: Minimum active minutes to be considered long running (default 60)
+    """
+    import json
+    result = await get_long_running_sessions_handler(minutes_threshold)
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_user_privileges(username: str) -> str:
+    """Audit and retrieve all system privileges and roles granted to a specific database user.
+    
+    Args:
+        username: Database username to audit
+    """
+    import json
+    result = await get_user_privileges_handler(username)
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_rman_backup_status(days: int = 7) -> str:
+    """Check the status of recent RMAN database backup jobs, including success/failure rates.
+    
+    Args:
+        days: Number of days to look back for backup jobs (default 7)
+    """
+    import json
+    result = await get_rman_backup_status_handler(days)
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_archive_log_rate(days: int = 7) -> str:
+    """Analyze the daily generation rate of archive logs in GB to identify abnormal redo generation.
+    
+    Args:
+        days: Number of days of history to analyze (default 7)
+    """
+    import json
+    result = await get_archive_log_rate_handler(days)
+    return json.dumps(result, indent=2, default=str)
+
+
+@tool
+async def get_flash_recovery_area() -> str:
+    """Check the Flash Recovery Area (FRA) space usage, limits, and component breakdown."""
+    import json
+    result = await get_flash_recovery_area_handler()
+    return json.dumps(result, indent=2, default=str)
+
+
 # All available tools
 SELF_HEALING_TOOLS = [
     monitor_alert_log,
@@ -159,6 +225,11 @@ SELF_HEALING_TOOLS = [
     get_tablespace_status,
     extend_tablespace,
     kill_session,
+    get_long_running_sessions,
+    get_user_privileges,
+    get_rman_backup_status,
+    get_archive_log_rate,
+    get_flash_recovery_area,
 ]
 
 

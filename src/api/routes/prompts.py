@@ -28,6 +28,7 @@ router = APIRouter()
 
 # Singleton service instance (initialized on first request)
 _prompt_service: Optional[PromptService] = None
+_chat_service = None  # ChatService singleton for prompt execution
 
 
 def get_prompt_service() -> PromptService:
@@ -163,18 +164,22 @@ async def execute_prompt(
                 detail=f"Required parameter '{param.name}' is missing",
             )
 
-    # Build final query from template
-    try:
-        final_query = prompt.prompt_template
-        for key, value in merged_params.items():
-            final_query = final_query.replace(f"{{{key}}}", str(value))
-    except Exception as e:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Failed to build query from template: {str(e)}",
-        )
+    # Build final query: use custom_query if provided, otherwise build from template
+    if request.custom_query:
+        final_query = request.custom_query
+    else:
+        try:
+            final_query = prompt.prompt_template
+            for key, value in merged_params.items():
+                final_query = final_query.replace(f"{{{key}}}", str(value))
+        except Exception as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Failed to build query from template: {str(e)}",
+            )
 
     start_time = time.time()
+    execution_id = str(__import__('uuid').uuid4())
 
     async def event_generator():
         """SSE event generator that streams the prompt execution."""
@@ -182,16 +187,29 @@ async def execute_prompt(
         status = "success"
 
         try:
-            # Import ChatService here to avoid circular imports
-            from src.api.services.chat_service import ChatService
-            chat_service = ChatService()
+            # Use singleton ChatService — avoid re-initializing on every call
+            global _chat_service
+            if _chat_service is None:
+                from src.api.services.chat_service import ChatService
+                _chat_service = ChatService()
+            chat_service = _chat_service
 
-            session_id = request.session_id
+            # CRITICAL: unique session_id per execution so MemorySaver
+            # doesn't bleed context between different prompt runs
+            session_id = f"prompt-exec-{execution_id}"
+            
+            logger.info(
+                "[Prompt %s] Executing '%s' | exec_id=%s | session=%s | query_len=%d",
+                prompt_id, prompt.title, execution_id[:8], session_id, len(final_query),
+            )
 
-            # Stream the response using the existing chat pipeline
-            async for event in chat_service.stream_response(
+            # Use stream_prompt_response — always routes through orchestrator
+            # (not viz_service which would discard the structured template)
+            async for event in chat_service.stream_prompt_response(
                 message=final_query,
                 session_id=session_id,
+                execution_id=execution_id,
+                prompt_category=prompt.category,
             ):
                 if isinstance(event, dict):
                     event_type = event.get("type", "token")

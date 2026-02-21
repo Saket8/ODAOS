@@ -131,6 +131,112 @@ class ChatService:
                 else:
                     yield word
     
+    async def stream_prompt_response(
+        self,
+        message: str,
+        session_id: str,
+        execution_id: str = "",
+        prompt_category: Optional[str] = None,
+    ) -> AsyncGenerator[str, None]:
+        """Stream response for prompt library execution using LIVE DB data.
+        
+        CRITICAL: Each execution uses a completely unique session_id
+        to prevent context bleeding between different prompt runs.
+        
+        Uses the SAME routing as stream_response() for chat:
+        - BRM/analytics prompts → viz_service (charts from live Oracle BRM tables)
+        - DBA/infrastructure prompts → orchestrator → agents with real DB tools
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        log_prefix = f"[PromptExec:{execution_id[:8]}]" if execution_id else "[PromptExec]"
+        
+        # CRITICAL: Force a unique session_id for EVERY execution
+        # This prevents MemorySaver from blending context between prompts.
+        unique_session = f"exec-{uuid4().hex[:12]}"
+        print(f"{log_prefix} Unique session: {unique_session} (original: {session_id})")
+        
+        if self._mock_mode:
+            print(f"{log_prefix} WARNING: Running in mock mode")
+            yield {"type": "token", "content": f"[Mock mode] The prompt query was:\n\n{message}"}
+            return
+        
+        if prompt_category:
+            is_analytics = any(val in prompt_category.lower() for val in ("analytics", "business", "brm"))
+        else:
+            is_analytics = self._is_analytics_query(message)
+            
+        route = "viz_service (analytics/BRM)" if is_analytics else "orchestrator (DBA/infra)"
+        print(f"{log_prefix} Routing through {route}")
+        print(f"{log_prefix} Query (first 200 chars): {message[:200]}")
+        
+        response = ""
+        try:
+            if is_analytics:
+                # BRM/analytics prompts → viz_service for live DB chart data
+                try:
+                    viz_response = await self.viz_service.generate_smart_viz(
+                        message, session_id=unique_session
+                    )
+                    narrative = viz_response.narrative
+                    chart = viz_response.chart
+                    
+                    # 1. Stream the chart data to the frontend
+                    yield {
+                        "type": "chart",
+                        "data": {
+                            "id": str(uuid4()),
+                            "type": chart.chart_type,
+                            "title": chart.title,
+                            "data": chart.data,
+                            "layout": chart.layout,
+                            "config": chart.config,
+                            "narrative": {
+                                "summary": narrative.summary,
+                                "insights": narrative.key_insights,
+                                "recommendations": narrative.recommendations
+                            }
+                        }
+                    }
+                    
+                    # 2. Build text response from live data narrative
+                    text_parts = []
+                    if narrative.summary:
+                        text_parts.append(f"**Summary:** {narrative.summary}")
+                    if narrative.key_insights:
+                        text_parts.append("\n\n**Key Insights:**")
+                        for insight in narrative.key_insights:
+                            text_parts.append(f"\n• {insight}")
+                    if narrative.recommendations:
+                        text_parts.append("\n\n**Recommendations:**")
+                        for rec in narrative.recommendations:
+                            text_parts.append(f"\n💡 {rec}")
+                    
+                    response = "".join(text_parts) if text_parts else "Here is the analysis for your request."
+                except Exception as e:
+                    print(f"{log_prefix} viz_service failed, falling back to orchestrator: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    response = await self.orchestrator.chat(message, thread_id=unique_session)
+            else:
+                # DBA/infrastructure prompts → orchestrator → agents with real DB tools
+                response = await self.orchestrator.chat(message, thread_id=unique_session)
+            
+            print(f"{log_prefix} Response received | length={len(response)}")
+            
+            # Stream word by word as dict events
+            words = response.split(' ')
+            for i, word in enumerate(words):
+                token = word + ' ' if i < len(words) - 1 else word
+                yield {"type": "token", "content": token}
+                
+        except Exception as e:
+            print(f"{log_prefix} ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            yield {"type": "error", "message": f"Error executing prompt: {str(e)}"}
+    
     async def generate_chart_if_needed(
         self,
         message: str,
@@ -225,11 +331,23 @@ class ChatService:
     def _is_analytics_query(self, message: str) -> bool:
         """Detect if a message is an analytics/visualization query."""
         analytics_keywords = [
-            "show", "chart", "graph", "plot", "visualize", "distribution",
-            "trend", "revenue", "customer", "product", "compare", "breakdown",
-            "pie", "bar", "line", "heatmap", "scatter", "analysis"
+            "revenue", "customer", "product", "billing", "payment",
+            "subscription", "arpu", "mrr", "churn", "distribution",
+            "trend", "breakdown"
         ]
+        
+        dba_keywords = [
+            "database", "dba", "session", "tablespace", "alert log",
+            "performance", "ash", "sql", "instance", "cpu", "memory",
+            "block", "error", "ora-"
+        ]
+        
         message_lower = message.lower()
+        
+        # If it contains database admin keywords, it's NOT an analytics query
+        if any(keyword in message_lower for keyword in dba_keywords):
+            return False
+            
         return any(keyword in message_lower for keyword in analytics_keywords)
     
     async def _extract_chart_data(self, query: str, session_id: Optional[str] = None) -> Optional[Dict[str, Any]]:

@@ -79,6 +79,7 @@ class PromptExecuteRequest(BaseModel):
     """Request body for executing a prompt with parameters."""
     parameters: Dict[str, Any] = {}
     session_id: Optional[str] = None
+    custom_query: Optional[str] = None  # User-edited query that overrides the template
 
 
 class PromptExecuteResponse(BaseModel):

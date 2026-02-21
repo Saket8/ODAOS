@@ -56,15 +56,22 @@ CLASSIFICATION_PROMPT = """You are a query router for an Oracle Database Operati
 Classify the user's query to determine which specialized agent(s) should handle it.
 
 Categories:
-- **performance**: Database performance, SQL analysis, wait events, metrics, slow queries
-- **healing**: Errors, incidents, blocking sessions, tablespace issues, remediation, fixes
+- **performance**: Database performance, SQL analysis, wait events, metrics, slow queries, TEMP, segments, I/O, ASH
+- **healing**: Errors, incidents, blocking sessions, tablespace/FRA issues, remediation, fixes, RMAN backups, archive log generation rate, user privileges, long running sessions
 - **cost**: OCI costs, spending, optimization, utilization, idle resources, budget
 - **composite**: Queries needing multiple agents (e.g., "complete health check", "overall status")
 - **general**: Greetings, general questions, not database-specific
 
 Examples:
 - "Check database metrics" → performance
+- "Show me Active Session History (ASH)" → performance
+- "What are my largest database segments?" → performance
+- "Check TEMP tablespace usage" → performance
 - "Fix blocking sessions" → healing  
+- "Are there any long running sessions?" → healing
+- "Check RMAN backup status" → healing
+- "What privileges does user APP_USER have?" → healing
+- "How fast is my archive log generating?" → healing
 - "How much are we spending?" → cost
 - "Complete health check" → composite (all agents)
 - "Why slow and is it expensive?" → composite (performance + cost)
@@ -94,14 +101,14 @@ async def classify_query(llm, query: str) -> QueryClassification:
         # Fallback: simple keyword-based classification
         query_lower = query.lower()
         
-        if any(w in query_lower for w in ["metric", "performance", "slow", "sql", "wait"]):
+        if any(w in query_lower for w in ["metric", "performance", "slow", "sql", "wait", "ash", "session history", "i/o", "io ", "datafile", "parameter", "uptime", "segment", "temp", "size", "cpu"]):
             return QueryClassification(
                 category="performance",
                 agents_needed=["performance"],
                 confidence=0.8,
                 reasoning="Query contains performance-related keywords"
             )
-        elif any(w in query_lower for w in ["block", "error", "fix", "heal", "kill", "extend"]):
+        elif any(w in query_lower for w in ["block", "error", "fix", "heal", "kill", "extend", "long running", "privilege", "role", "grant", "rman", "backup", "archive", "redo", "fra", "flash recovery"]):
             return QueryClassification(
                 category="healing",
                 agents_needed=["healing"],

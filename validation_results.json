@@ -1,0 +1,548 @@
+[
+  {
+    "id": "brm-customer-002",
+    "title": "Customer Churn Analysis",
+    "category": "BRM_CUSTOMER",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Customer Churn Rate",
+    "chart_type": "line",
+    "text_length": 302,
+    "elapsed_s": 7.9,
+    "checks": [
+      "302 chars",
+      "line chart: 'Customer Churn Rate'"
+    ]
+  },
+  {
+    "id": "brm-customer-001",
+    "title": "Customer Distribution by Region",
+    "category": "BRM_CUSTOMER",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Customer Distribution by Region",
+    "chart_type": "bar",
+    "text_length": 333,
+    "elapsed_s": 1.2,
+    "checks": [
+      "333 chars",
+      "bar chart: 'Customer Distribution by Region'"
+    ]
+  },
+  {
+    "id": "brm-customer-004",
+    "title": "Customer Segmentation Analysis",
+    "category": "BRM_CUSTOMER",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Customer Segmentation",
+    "chart_type": "pie",
+    "text_length": 316,
+    "elapsed_s": 2.3,
+    "checks": [
+      "316 chars",
+      "pie chart: 'Customer Segmentation'"
+    ]
+  },
+  {
+    "id": "brm-customer-003",
+    "title": "New Customer Acquisition Trend",
+    "category": "BRM_CUSTOMER",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "New Customer Acquisition Trend",
+    "chart_type": "bar",
+    "text_length": 318,
+    "elapsed_s": 2.3,
+    "checks": [
+      "318 chars",
+      "bar chart: 'New Customer Acquisition Trend'"
+    ]
+  },
+  {
+    "id": "brm-ops-001",
+    "title": "Bill Cycle Status",
+    "category": "BRM_OPERATIONS",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Bill Cycle Success Rate",
+    "chart_type": "bar",
+    "text_length": 315,
+    "elapsed_s": 0.7,
+    "checks": [
+      "315 chars",
+      "bar chart: 'Bill Cycle Success Rate'"
+    ]
+  },
+  {
+    "id": "brm-ops-003",
+    "title": "Rating Engine Performance",
+    "category": "BRM_OPERATIONS",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Rating Engine Throughput",
+    "chart_type": "line",
+    "text_length": 319,
+    "elapsed_s": 0.6,
+    "checks": [
+      "319 chars",
+      "line chart: 'Rating Engine Throughput'"
+    ]
+  },
+  {
+    "id": "brm-ops-002",
+    "title": "Service Provisioning Queue",
+    "category": "BRM_OPERATIONS",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Service Provisioning Queue",
+    "chart_type": "bar",
+    "text_length": 320,
+    "elapsed_s": 0.9,
+    "checks": [
+      "320 chars",
+      "bar chart: 'Service Provisioning Queue'"
+    ]
+  },
+  {
+    "id": "brm-payment-003",
+    "title": "Failed Payment Root Cause",
+    "category": "BRM_PAYMENT",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Failed Payment Root Cause",
+    "chart_type": "bar",
+    "text_length": 341,
+    "elapsed_s": 1.9,
+    "checks": [
+      "341 chars",
+      "bar chart: 'Failed Payment Root Cause'"
+    ]
+  },
+  {
+    "id": "brm-payment-001",
+    "title": "Overdue Payment Analysis",
+    "category": "BRM_PAYMENT",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Overdue Payment Aging",
+    "chart_type": "bar",
+    "text_length": 327,
+    "elapsed_s": 1.7,
+    "checks": [
+      "327 chars",
+      "bar chart: 'Overdue Payment Aging'"
+    ]
+  },
+  {
+    "id": "brm-payment-002",
+    "title": "Payment Method Distribution",
+    "category": "BRM_PAYMENT",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Payment Method Distribution",
+    "chart_type": "bar",
+    "text_length": 328,
+    "elapsed_s": 1.8,
+    "checks": [
+      "328 chars",
+      "bar chart: 'Payment Method Distribution'"
+    ]
+  },
+  {
+    "id": "brm-payment-004",
+    "title": "Payment Reconciliation Report",
+    "category": "BRM_PAYMENT",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Payment Reconciliation",
+    "chart_type": "pie",
+    "text_length": 315,
+    "elapsed_s": 0.8,
+    "checks": [
+      "315 chars",
+      "pie chart: 'Payment Reconciliation'"
+    ]
+  },
+  {
+    "id": "brm-revenue-001",
+    "title": "Monthly Revenue Trend",
+    "category": "BRM_REVENUE",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Revenue Trends",
+    "chart_type": "line",
+    "text_length": 308,
+    "elapsed_s": 0.9,
+    "checks": [
+      "308 chars",
+      "line chart: 'Revenue Trends'"
+    ]
+  },
+  {
+    "id": "brm-revenue-004",
+    "title": "Revenue Leakage Detection",
+    "category": "BRM_REVENUE",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Revenue Leakage Detection",
+    "chart_type": "pie",
+    "text_length": 337,
+    "elapsed_s": 0.7,
+    "checks": [
+      "337 chars",
+      "pie chart: 'Revenue Leakage Detection'"
+    ]
+  },
+  {
+    "id": "brm-revenue-002",
+    "title": "Revenue by Product Category",
+    "category": "BRM_REVENUE",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Product Market Share",
+    "chart_type": "bar",
+    "text_length": 321,
+    "elapsed_s": 1.0,
+    "checks": [
+      "321 chars",
+      "bar chart: 'Product Market Share'"
+    ]
+  },
+  {
+    "id": "aa179f1b-44ec-4a7f-8b48-6809550ab02b",
+    "title": "Test Prompt",
+    "category": "BRM_REVENUE",
+    "status": "SKIP",
+    "reason": "Test prompt"
+  },
+  {
+    "id": "7f165506-7dd2-4dcf-9ff0-b14e3462c086",
+    "title": "Test Prompt",
+    "category": "BRM_REVENUE",
+    "status": "SKIP",
+    "reason": "Test prompt"
+  },
+  {
+    "id": "brm-revenue-003",
+    "title": "Top Revenue Generating Accounts",
+    "category": "BRM_REVENUE",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": true,
+    "chart_title": "Top Revenue Generating Accounts",
+    "chart_type": "bar",
+    "text_length": 325,
+    "elapsed_s": 0.7,
+    "checks": [
+      "325 chars",
+      "bar chart: 'Top Revenue Generating Accounts'"
+    ]
+  },
+  {
+    "id": "dba-backup-002",
+    "title": "Archive Log Generation Rate",
+    "category": "DBA_BACKUP",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 2133,
+    "elapsed_s": 26.0,
+    "checks": [
+      "2135 chars"
+    ]
+  },
+  {
+    "id": "dba-backup-004",
+    "title": "Flash Recovery Area Usage",
+    "category": "DBA_BACKUP",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 1934,
+    "elapsed_s": 27.3,
+    "checks": [
+      "1934 chars"
+    ]
+  },
+  {
+    "id": "dba-backup-001",
+    "title": "RMAN Backup Status",
+    "category": "DBA_BACKUP",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 1123,
+    "elapsed_s": 14.4,
+    "checks": [
+      "1123 chars"
+    ]
+  },
+  {
+    "id": "dba-backup-003",
+    "title": "Recovery Point Objective Check",
+    "category": "DBA_BACKUP",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 1826,
+    "elapsed_s": 19.8,
+    "checks": [
+      "1826 chars"
+    ]
+  },
+  {
+    "id": "dba-cap-003",
+    "title": "ASM Disk Group Usage",
+    "category": "DBA_CAPACITY",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 2147,
+    "elapsed_s": 26.3,
+    "checks": [
+      "2147 chars"
+    ]
+  },
+  {
+    "id": "dba-cap-002",
+    "title": "Segment Growth Analysis",
+    "category": "DBA_CAPACITY",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 866,
+    "elapsed_s": 14.1,
+    "checks": [
+      "866 chars"
+    ]
+  },
+  {
+    "id": "dba-cap-001",
+    "title": "Tablespace Usage Report",
+    "category": "DBA_CAPACITY",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 3399,
+    "elapsed_s": 38.5,
+    "checks": [
+      "3399 chars"
+    ]
+  },
+  {
+    "id": "dba-cap-004",
+    "title": "Temp Space Usage",
+    "category": "DBA_CAPACITY",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 1297,
+    "elapsed_s": 17.6,
+    "checks": [
+      "1297 chars"
+    ]
+  },
+  {
+    "id": "dba-health-002",
+    "title": "Alert Log Analysis",
+    "category": "DBA_HEALTH",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 3618,
+    "elapsed_s": 36.8,
+    "checks": [
+      "3618 chars"
+    ]
+  },
+  {
+    "id": "dba-health-001",
+    "title": "Database Health Check",
+    "category": "DBA_HEALTH",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 2730,
+    "elapsed_s": 62.5,
+    "checks": [
+      "2730 chars"
+    ]
+  },
+  {
+    "id": "dba-health-004",
+    "title": "Database Uptime Report",
+    "category": "DBA_HEALTH",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 1727,
+    "elapsed_s": 19.9,
+    "checks": [
+      "1727 chars"
+    ]
+  },
+  {
+    "id": "dba-health-003",
+    "title": "Instance Parameter Review",
+    "category": "DBA_HEALTH",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 1542,
+    "elapsed_s": 16.3,
+    "checks": [
+      "1542 chars"
+    ]
+  },
+  {
+    "id": "dba-perf-003",
+    "title": "Active Session History",
+    "category": "DBA_PERFORMANCE",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 1621,
+    "elapsed_s": 18.2,
+    "checks": [
+      "1621 chars"
+    ]
+  },
+  {
+    "id": "dba-perf-004",
+    "title": "I/O Performance Analysis",
+    "category": "DBA_PERFORMANCE",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 1072,
+    "elapsed_s": 14.4,
+    "checks": [
+      "1072 chars"
+    ]
+  },
+  {
+    "id": "dba-perf-001",
+    "title": "Top SQL by Elapsed Time",
+    "category": "DBA_PERFORMANCE",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 3770,
+    "elapsed_s": 38.9,
+    "checks": [
+      "3770 chars"
+    ]
+  },
+  {
+    "id": "dba-perf-002",
+    "title": "Wait Event Analysis",
+    "category": "DBA_PERFORMANCE",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 2657,
+    "elapsed_s": 27.3,
+    "checks": [
+      "2657 chars"
+    ]
+  },
+  {
+    "id": "dba-sec-001",
+    "title": "Blocking Session Analysis",
+    "category": "DBA_SECURITY",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 277,
+    "elapsed_s": 9.5,
+    "checks": [
+      "277 chars"
+    ]
+  },
+  {
+    "id": "dba-sec-003",
+    "title": "Kill Blocking Session",
+    "category": "DBA_SECURITY",
+    "status": "FAIL",
+    "reason": "Unresolved placeholders: ['sid', 'serial']"
+  },
+  {
+    "id": "dba-sec-002",
+    "title": "Long Running Sessions",
+    "category": "DBA_SECURITY",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 800,
+    "elapsed_s": 13.1,
+    "checks": [
+      "800 chars"
+    ]
+  },
+  {
+    "id": "dba-sec-004",
+    "title": "User Privilege Audit",
+    "category": "DBA_SECURITY",
+    "status": "PASS",
+    "reason": "",
+    "has_chart": false,
+    "chart_title": "",
+    "chart_type": "",
+    "text_length": 859,
+    "elapsed_s": 8.6,
+    "checks": [
+      "859 chars"
+    ]
+  }
+]

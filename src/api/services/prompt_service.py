@@ -179,7 +179,7 @@ class PromptService:
         with sqlite3.connect(self.db_path) as conn:
             for p in prompts:
                 conn.execute(
-                    """INSERT OR IGNORE INTO prompt_library
+                    """INSERT OR REPLACE INTO prompt_library
                        (id, category, title, description, prompt_template,
                         parameters, default_values, expected_output, tags,
                         difficulty_level, estimated_runtime, requires_approval)
@@ -213,7 +213,7 @@ class PromptService:
                 "category": "BRM_REVENUE",
                 "title": "Monthly Revenue Trend",
                 "description": "Analyze monthly revenue trends over a specified period with growth rates and forecasting.",
-                "prompt_template": "Show the monthly revenue trend for the last {months} months. Include month-over-month growth percentages and highlight any significant changes.",
+                "prompt_template": "Show the monthly revenue trend for the last {months} months. Include month-over-month growth percentages and highlight any significant changes.\n\nProvide a structured analysis:\n1. DATA TABLE: Present the data in a markdown table with columns: Month, Revenue, MoM Growth %, Trend\n2. TREND ANALYSIS: Describe overall direction, seasonality patterns, and growth/decline periods\n3. KEY INSIGHTS: List 3-5 bullet points highlighting notable findings\n4. RECOMMENDATIONS: Suggest 2-3 actionable items based on the trends",
                 "parameters": [
                     {"name": "months", "type": "integer", "description": "Number of months to analyze", "required": True, "default": 12}
                 ],
@@ -228,7 +228,7 @@ class PromptService:
                 "category": "BRM_REVENUE",
                 "title": "Revenue by Product Category",
                 "description": "Break down revenue by product or service category for a given quarter.",
-                "prompt_template": "Show revenue breakdown by product category for {quarter} {year}. Include percentages and compare with the previous quarter.",
+                "prompt_template": "Show revenue breakdown by product category for {quarter} {year}. Include percentages and compare with the previous quarter.\n\nProvide a structured analysis:\n1. DATA TABLE: Category, Revenue, % Share, QoQ Change\n2. ANALYSIS: Which categories are growing/declining and why\n3. KEY INSIGHTS: Top 3-5 findings about category performance\n4. RECOMMENDATIONS: Focus areas and potential opportunities",
                 "parameters": [
                     {"name": "quarter", "type": "enum", "description": "Quarter", "required": True, "default": "Q4", "enum_values": ["Q1", "Q2", "Q3", "Q4"]},
                     {"name": "year", "type": "integer", "description": "Year", "required": True, "default": 2025}
@@ -244,7 +244,7 @@ class PromptService:
                 "category": "BRM_REVENUE",
                 "title": "Top Revenue Generating Accounts",
                 "description": "Identify the highest revenue-generating customer accounts with usage patterns.",
-                "prompt_template": "List the top {count} revenue-generating accounts. Show their total revenue, product mix, and growth trend for the last {months} months.",
+                "prompt_template": "List the top {count} revenue-generating accounts. Show their total revenue, product mix, and growth trend for the last {months} months.\n\nProvide a structured analysis:\n1. DATA TABLE: Rank, Account, Total Revenue, Primary Products, Growth Rate\n2. CONCENTRATION ANALYSIS: Revenue concentration risk (top 5, top 10 share)\n3. KEY INSIGHTS: Account-level patterns and risks\n4. RECOMMENDATIONS: Retention strategies for top accounts",
                 "parameters": [
                     {"name": "count", "type": "integer", "description": "Number of top accounts", "required": True, "default": 20},
                     {"name": "months", "type": "integer", "description": "Period in months", "required": True, "default": 6}
@@ -260,7 +260,7 @@ class PromptService:
                 "category": "BRM_REVENUE",
                 "title": "Revenue Leakage Detection",
                 "description": "Identify potential revenue leakage from unbilled services, rating errors, or discrepancies.",
-                "prompt_template": "Analyze billing data for potential revenue leakage. Check for unbilled CDRs, rating mismatches, and service-charge discrepancies over the last {days} days.",
+                "prompt_template": "Analyze billing data for potential revenue leakage. Check for unbilled CDRs, rating mismatches, and service-charge discrepancies over the last {days} days.\n\nProvide a structured analysis:\n1. DATA TABLE: Leakage Type, Affected Records, Estimated Revenue Impact\n2. ROOT CAUSE: Identify patterns or systemic issues causing each leakage type\n3. KEY INSIGHTS: Severity ranking and business impact\n4. RECOMMENDATIONS: Remediation steps prioritized by financial impact",
                 "parameters": [
                     {"name": "days", "type": "integer", "description": "Lookback period in days", "required": True, "default": 30}
                 ],
@@ -280,7 +280,7 @@ class PromptService:
                 "category": "BRM_CUSTOMER",
                 "title": "Customer Distribution by Region",
                 "description": "Visualize customer distribution across geographical regions with density mapping.",
-                "prompt_template": "Show customer distribution by region. Include total counts, percentage share, and growth rate for each region.",
+                "prompt_template": "Show customer distribution by region. Include total counts, percentage share, and growth rate for each region.\n\nProvide a structured analysis:\n1. DATA TABLE: Region, Customer Count, % Share, YoY Growth\n2. GEOGRAPHIC ANALYSIS: Distribution patterns and regional strengths\n3. KEY INSIGHTS: Underserved regions with growth potential\n4. RECOMMENDATIONS: Market expansion priorities",
                 "parameters": [],
                 "default_values": {},
                 "expected_output": "Bar chart with regional distribution + table",
@@ -293,7 +293,7 @@ class PromptService:
                 "category": "BRM_CUSTOMER",
                 "title": "Customer Churn Analysis",
                 "description": "Analyze customer churn rate, at-risk accounts, and common churn reasons.",
-                "prompt_template": "Analyze customer churn over the last {months} months. Show churn rate trend, top {count} reasons for churn, and identify currently at-risk accounts.",
+                "prompt_template": "Analyze customer churn over the last {months} months. Show churn rate trend, top {count} reasons for churn, and identify currently at-risk accounts.\n\nProvide a structured analysis:\n1. DATA TABLE: Month, Churned Customers, Churn Rate %, Revenue Lost\n2. CHURN REASON ANALYSIS: Top reasons ranked by frequency and revenue impact\n3. AT-RISK LIST: Currently at-risk accounts with risk indicators\n4. RECOMMENDATIONS: Targeted retention strategies per churn reason",
                 "parameters": [
                     {"name": "months", "type": "integer", "description": "Analysis period in months", "required": True, "default": 6},
                     {"name": "count", "type": "integer", "description": "Top N churn reasons", "required": True, "default": 5}
@@ -309,7 +309,7 @@ class PromptService:
                 "category": "BRM_CUSTOMER",
                 "title": "New Customer Acquisition Trend",
                 "description": "Track new customer sign-ups over time with source channel breakdown.",
-                "prompt_template": "Show new customer acquisitions over the last {months} months. Break down by acquisition channel and compare with targets.",
+                "prompt_template": "Show new customer acquisitions over the last {months} months. Break down by acquisition channel and compare with targets.\n\nProvide a structured analysis:\n1. DATA TABLE: Month, New Customers, Channel Breakdown, vs Target %\n2. CHANNEL ANALYSIS: Cost per acquisition and conversion rates by channel\n3. KEY INSIGHTS: Most effective channels and seasonal patterns\n4. RECOMMENDATIONS: Budget allocation adjustments",
                 "parameters": [
                     {"name": "months", "type": "integer", "description": "Period in months", "required": True, "default": 12}
                 ],
@@ -324,7 +324,7 @@ class PromptService:
                 "category": "BRM_CUSTOMER",
                 "title": "Customer Segmentation Analysis",
                 "description": "Segment customers by ARPU, tenure, and product usage for targeted strategies.",
-                "prompt_template": "Perform customer segmentation based on ARPU, tenure, and product usage. Identify the top {count} segments with their characteristics.",
+                "prompt_template": "Perform customer segmentation based on ARPU, tenure, and product usage. Identify the top {count} segments with their characteristics.\n\nProvide a structured analysis:\n1. DATA TABLE: Segment, Size, Avg ARPU, Avg Tenure, Primary Products, Growth Trend\n2. SEGMENT PROFILES: Detailed characteristics and behavior patterns per segment\n3. KEY INSIGHTS: Highest-value segments and underserved opportunities\n4. RECOMMENDATIONS: Targeted strategies per segment",
                 "parameters": [
                     {"name": "count", "type": "integer", "description": "Number of segments", "required": True, "default": 5}
                 ],
@@ -343,7 +343,7 @@ class PromptService:
                 "category": "BRM_PAYMENT",
                 "title": "Overdue Payment Analysis",
                 "description": "Analyze overdue payments, aging buckets, and collection effectiveness.",
-                "prompt_template": "Show overdue payment analysis. Include aging buckets (30/60/90/120+ days), total overdue amount, and top {count} overdue accounts.",
+                "prompt_template": "Show overdue payment analysis. Include aging buckets (30/60/90/120+ days), total overdue amount, and top {count} overdue accounts.\n\nProvide a structured analysis:\n1. DATA TABLE: Aging Bucket, Count, Total Amount, % of Total\n2. ACCOUNT LIST: Top overdue accounts with amount, days overdue, contact history\n3. KEY INSIGHTS: Trends in overdue patterns and collection effectiveness\n4. RECOMMENDATIONS: Priority collection actions and process improvements",
                 "parameters": [
                     {"name": "count", "type": "integer", "description": "Top N overdue accounts", "required": True, "default": 20}
                 ],
@@ -358,7 +358,7 @@ class PromptService:
                 "category": "BRM_PAYMENT",
                 "title": "Payment Method Distribution",
                 "description": "Break down payments by method (credit card, bank transfer, etc.) with success rates.",
-                "prompt_template": "Show payment method distribution for the last {months} months. Include volume, value, success rate, and failure reasons per method.",
+                "prompt_template": "Show payment method distribution for the last {months} months. Include volume, value, success rate, and failure reasons per method.\n\nProvide a structured analysis:\n1. DATA TABLE: Method, Volume, Total Value, Success Rate %, Top Failure Reason\n2. TREND ANALYSIS: Shifts in payment method preference over time\n3. KEY INSIGHTS: Methods with low success rates requiring attention\n4. RECOMMENDATIONS: Steps to improve success rates and encourage preferred methods",
                 "parameters": [
                     {"name": "months", "type": "integer", "description": "Period in months", "required": True, "default": 3}
                 ],
@@ -373,7 +373,7 @@ class PromptService:
                 "category": "BRM_PAYMENT",
                 "title": "Failed Payment Root Cause",
                 "description": "Investigate patterns in failed payments and identify systemic issues.",
-                "prompt_template": "Analyze failed payments over the last {days} days. Group by failure reason, identify trends, and flag any systemic issues.",
+                "prompt_template": "Analyze failed payments over the last {days} days. Group by failure reason, identify trends, and flag any systemic issues.\n\nProvide a structured analysis:\n1. DATA TABLE: Failure Reason, Count, Total Value, Trend (Up/Down/Stable)\n2. PATTERN ANALYSIS: Time-based patterns (day/hour), customer segments affected\n3. KEY INSIGHTS: Systemic issues vs. one-off failures\n4. RECOMMENDATIONS: Technical fixes and process changes to reduce failures",
                 "parameters": [
                     {"name": "days", "type": "integer", "description": "Lookback in days", "required": True, "default": 14}
                 ],
@@ -388,7 +388,7 @@ class PromptService:
                 "category": "BRM_PAYMENT",
                 "title": "Payment Reconciliation Report",
                 "description": "Reconcile payments against invoices and flag mismatches or unallocated payments.",
-                "prompt_template": "Run payment reconciliation for the last {days} days. Identify unmatched payments, overpayments, underpayments, and unapplied credits.",
+                "prompt_template": "Run payment reconciliation for the last {days} days. Identify unmatched payments, overpayments, underpayments, and unapplied credits.\n\nProvide a structured analysis:\n1. DATA TABLE: Category (Unmatched/Over/Under/Unapplied), Count, Total Amount\n2. DETAIL LIST: Top mismatches with payment and invoice references\n3. KEY INSIGHTS: Common mismatch patterns and root causes\n4. RECOMMENDATIONS: Process improvements and system configuration changes",
                 "parameters": [
                     {"name": "days", "type": "integer", "description": "Reconciliation period in days", "required": True, "default": 30}
                 ],
@@ -407,7 +407,7 @@ class PromptService:
                 "category": "BRM_OPERATIONS",
                 "title": "Bill Cycle Status",
                 "description": "Check status of current and recent billing cycles across all bill segments.",
-                "prompt_template": "Show the status of billing cycles for the last {count} cycles. Include success rate, error counts, processing time, and any stuck jobs.",
+                "prompt_template": "Show the status of billing cycles for the last {count} cycles. Include success rate, error counts, processing time, and any stuck jobs.\n\nProvide a structured analysis:\n1. DATA TABLE: Cycle, Start/End Time, Records Processed, Success Rate, Errors, Duration\n2. TREND ANALYSIS: Processing time and error rate trends across cycles\n3. KEY INSIGHTS: Recurring issues and performance bottlenecks\n4. RECOMMENDATIONS: Optimizations for faster and more reliable bill runs",
                 "parameters": [
                     {"name": "count", "type": "integer", "description": "Number of recent cycles", "required": True, "default": 5}
                 ],
@@ -422,7 +422,7 @@ class PromptService:
                 "category": "BRM_OPERATIONS",
                 "title": "Service Provisioning Queue",
                 "description": "Monitor the service provisioning pipeline for pending, in-progress, and failed orders.",
-                "prompt_template": "Show the current service provisioning queue status. Include pending, in-progress, completed, and failed counts for the last {hours} hours.",
+                "prompt_template": "Show the current service provisioning queue status. Include pending, in-progress, completed, and failed counts for the last {hours} hours.\n\nProvide a structured analysis:\n1. DATA TABLE: Status (Pending/In-Progress/Completed/Failed), Count, Avg Age, Oldest Order\n2. FAILURE ANALYSIS: Top reasons for failed provisioning orders\n3. KEY INSIGHTS: Queue health and throughput capacity\n4. RECOMMENDATIONS: Bottleneck resolution and capacity planning",
                 "parameters": [
                     {"name": "hours", "type": "integer", "description": "Lookback in hours", "required": True, "default": 24}
                 ],
@@ -437,7 +437,7 @@ class PromptService:
                 "category": "BRM_OPERATIONS",
                 "title": "Rating Engine Performance",
                 "description": "Analyze the BRM rating engine throughput, latency, and error rates.",
-                "prompt_template": "Show rating engine performance metrics for the last {days} days. Include throughput (events/sec), average latency, error rate, and peak loads.",
+                "prompt_template": "Show rating engine performance metrics for the last {days} days. Include throughput (events/sec), average latency, error rate, and peak loads.\n\nProvide a structured analysis:\n1. DATA TABLE: Date, Avg Throughput, Peak Throughput, Avg Latency, Error Rate %\n2. PATTERN ANALYSIS: Peak usage patterns, latency spikes, error correlation\n3. KEY INSIGHTS: Capacity utilization and performance trends\n4. RECOMMENDATIONS: Scaling recommendations and performance tuning",
                 "parameters": [
                     {"name": "days", "type": "integer", "description": "Period in days", "required": True, "default": 7}
                 ],
@@ -456,7 +456,7 @@ class PromptService:
                 "category": "DBA_HEALTH",
                 "title": "Database Health Check",
                 "description": "Comprehensive database health overview including uptime, alerts, and key metrics.",
-                "prompt_template": "Perform a comprehensive health check on the database. Include uptime, alert log warnings, SGA/PGA utilization, active sessions, and overall status.",
+                "prompt_template": "Perform a comprehensive health check on the database. Include uptime, alert log warnings, SGA/PGA utilization, active sessions, and overall status.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. HEALTH SUMMARY: Overall status (Healthy/Warning/Critical) with a summary dashboard table showing: Metric, Current Value, Status, Threshold\n2. DETAILED METRICS: Uptime, SGA/PGA hit ratios, active sessions count, alert log warnings\n3. KEY FINDINGS: Top 3-5 observations about database health\n4. RECOMMENDATIONS: Immediate actions and monitoring improvements",
                 "parameters": [],
                 "default_values": {},
                 "expected_output": "Health dashboard with status indicators and key metrics",
@@ -469,7 +469,7 @@ class PromptService:
                 "category": "DBA_HEALTH",
                 "title": "Alert Log Analysis",
                 "description": "Parse and analyze recent Oracle alert log entries for errors and warnings.",
-                "prompt_template": "Analyze the alert log for the last {hours} hours. Summarize ORA- errors, warnings, and notable events. Group by severity.",
+                "prompt_template": "Analyze the alert log for the last {hours} hours. Summarize ORA- errors, warnings, and notable events. Group by severity.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Timestamp, Severity, ORA Code, Message, Occurrence Count\n2. SEVERITY BREAKDOWN: Group errors by severity with counts and trends\n3. KEY FINDINGS: Most critical errors, recurring patterns, anomalies\n4. RECOMMENDATIONS: Remediation steps for top errors",
                 "parameters": [
                     {"name": "hours", "type": "integer", "description": "Lookback in hours", "required": True, "default": 24}
                 ],
@@ -484,7 +484,7 @@ class PromptService:
                 "category": "DBA_HEALTH",
                 "title": "Instance Parameter Review",
                 "description": "Review key Oracle instance parameters and highlight non-default settings.",
-                "prompt_template": "List all non-default Oracle instance parameters. Flag any settings that deviate from Oracle best practices for a {workload_type} workload.",
+                "prompt_template": "List all non-default Oracle instance parameters. Flag any settings that deviate from Oracle best practices for a {workload_type} workload.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Parameter Name, Current Value, Default Value, Oracle Recommended, Status (OK/Warning/Critical)\n2. ANALYSIS: Which parameters deviate from best practices and why it matters\n3. KEY FINDINGS: Most impactful misconfigurations\n4. RECOMMENDATIONS: Parameter changes with expected impact",
                 "parameters": [
                     {"name": "workload_type", "type": "enum", "description": "Workload type", "required": True, "default": "OLTP", "enum_values": ["OLTP", "OLAP", "Mixed"]}
                 ],
@@ -499,7 +499,7 @@ class PromptService:
                 "category": "DBA_HEALTH",
                 "title": "Database Uptime Report",
                 "description": "Show database uptime, recent restarts, and availability percentage.",
-                "prompt_template": "Show database uptime report for the last {days} days. Include startup times, planned/unplanned downtime, and availability percentage.",
+                "prompt_template": "Show database uptime report for the last {days} days. Include startup times, planned/unplanned downtime, and availability percentage.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Date, Event Type (Startup/Shutdown), Time, Duration, Planned/Unplanned\n2. AVAILABILITY SUMMARY: Total uptime %, downtime hours, MTBF, MTTR\n3. KEY FINDINGS: Patterns in downtime, SLA compliance status\n4. RECOMMENDATIONS: Availability improvement suggestions",
                 "parameters": [
                     {"name": "days", "type": "integer", "description": "Period in days", "required": True, "default": 30}
                 ],
@@ -518,7 +518,7 @@ class PromptService:
                 "category": "DBA_PERFORMANCE",
                 "title": "Top SQL by Elapsed Time",
                 "description": "Identify the most resource-intensive SQL statements consuming the most elapsed time.",
-                "prompt_template": "Show the top {count} SQL statements by total elapsed time. Include execution count, average elapsed, buffer gets, and the SQL text.",
+                "prompt_template": "Show the top {count} SQL statements by total elapsed time. Include execution count, average elapsed, buffer gets, and the SQL text.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Rank, SQL ID, Elapsed Time (s), Executions, Avg Elapsed (ms), Buffer Gets, SQL Text (truncated)\n2. ANALYSIS: Common patterns among top SQL, optimization opportunities\n3. KEY FINDINGS: Most impactful queries and their resource consumption\n4. RECOMMENDATIONS: Tuning suggestions for top consumers",
                 "parameters": [
                     {"name": "count", "type": "integer", "description": "Top N SQL statements", "required": True, "default": 10}
                 ],
@@ -533,7 +533,7 @@ class PromptService:
                 "category": "DBA_PERFORMANCE",
                 "title": "Wait Event Analysis",
                 "description": "Analyze top database wait events to identify performance bottlenecks.",
-                "prompt_template": "Show the top {count} wait events for the last {hours} hours. Include total waits, average wait time, and suggested actions.",
+                "prompt_template": "Show the top {count} wait events for the last {hours} hours. Include total waits, average wait time, and suggested actions.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Rank, Wait Event, Wait Class, Total Waits, Avg Wait (ms), % of Total, Time Waited (s)\n2. ANALYSIS: Wait event patterns, correlations, and root cause indicators\n3. KEY FINDINGS: Dominant bottlenecks and their impact\n4. RECOMMENDATIONS: Specific actions to reduce each top wait event",
                 "parameters": [
                     {"name": "count", "type": "integer", "description": "Top N events", "required": True, "default": 10},
                     {"name": "hours", "type": "integer", "description": "Lookback in hours", "required": True, "default": 1}
@@ -549,7 +549,7 @@ class PromptService:
                 "category": "DBA_PERFORMANCE",
                 "title": "Active Session History",
                 "description": "Analyze active session history (ASH) to understand workload patterns.",
-                "prompt_template": "Analyze ASH data for the last {minutes} minutes. Show top sessions, SQL execution patterns, wait class distribution, and resource contention.",
+                "prompt_template": "Analyze ASH data for the last {minutes} minutes. Show top sessions, SQL execution patterns, wait class distribution, and resource contention.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Session ID, Username, SQL ID, Wait Class, % Activity, Program\n2. WAIT CLASS DISTRIBUTION: Table showing each wait class and its % of total activity\n3. KEY FINDINGS: Hot sessions, resource contention points, workload patterns\n4. RECOMMENDATIONS: Workload balancing and contention resolution",
                 "parameters": [
                     {"name": "minutes", "type": "integer", "description": "Lookback in minutes", "required": True, "default": 30}
                 ],
@@ -564,7 +564,7 @@ class PromptService:
                 "category": "DBA_PERFORMANCE",
                 "title": "I/O Performance Analysis",
                 "description": "Analyze database I/O performance across datafiles and tablespaces.",
-                "prompt_template": "Show I/O performance statistics. Include read/write IOPS per datafile, average latency, and identify any I/O bottleneck tablespaces.",
+                "prompt_template": "Show I/O performance statistics. Include read/write IOPS per datafile, average latency, and identify any I/O bottleneck tablespaces.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Datafile, Tablespace, Read IOPS, Write IOPS, Avg Read Latency (ms), Avg Write Latency (ms), Status\n2. ANALYSIS: I/O distribution patterns, hot files, latency anomalies\n3. KEY FINDINGS: Bottleneck tablespaces and their impact\n4. RECOMMENDATIONS: Storage optimization and I/O improvement actions",
                 "parameters": [],
                 "default_values": {},
                 "expected_output": "I/O stats per datafile with latency and IOPS",
@@ -581,7 +581,7 @@ class PromptService:
                 "category": "DBA_CAPACITY",
                 "title": "Tablespace Usage Report",
                 "description": "Show tablespace usage, free space, and growth projections.",
-                "prompt_template": "Show tablespace usage for all tablespaces. Include used/free space in GB, percentage used, autoextend status, and project when each will hit {threshold}% full.",
+                "prompt_template": "Show tablespace usage for all tablespaces. Include used/free space in GB, percentage used, autoextend status, and project when each will hit {threshold}% full.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Tablespace, Size (GB), Used (GB), Free (GB), % Used, Autoextend, Projected Full Date\n2. ANALYSIS: Growth trends, tablespaces approaching threshold\n3. KEY FINDINGS: Critical tablespaces needing attention\n4. RECOMMENDATIONS: Resize actions and monitoring thresholds",
                 "parameters": [
                     {"name": "threshold", "type": "integer", "description": "Alert threshold %", "required": True, "default": 85}
                 ],
@@ -596,7 +596,7 @@ class PromptService:
                 "category": "DBA_CAPACITY",
                 "title": "Segment Growth Analysis",
                 "description": "Identify the fastest-growing database segments (tables, indexes, LOBs).",
-                "prompt_template": "Show the top {count} fastest-growing segments over the last {days} days. Include segment type, current size, growth rate, and projected size in 30 days.",
+                "prompt_template": "Show the top {count} fastest-growing segments over the last {days} days. Include segment type, current size, growth rate, and projected size in 30 days.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Rank, Segment Name, Type, Schema, Current Size (GB), Growth/Day (MB), Projected 30-Day Size (GB)\n2. ANALYSIS: Growth patterns, seasonal trends, anomalous growth\n3. KEY FINDINGS: Segments requiring immediate attention\n4. RECOMMENDATIONS: Archival, partitioning, or resize strategies",
                 "parameters": [
                     {"name": "count", "type": "integer", "description": "Top N segments", "required": True, "default": 15},
                     {"name": "days", "type": "integer", "description": "Analysis period in days", "required": True, "default": 30}
@@ -612,7 +612,7 @@ class PromptService:
                 "category": "DBA_CAPACITY",
                 "title": "ASM Disk Group Usage",
                 "description": "Show ASM disk group utilization and rebalance status.",
-                "prompt_template": "Show ASM disk group usage. Include total/free/used space, redundancy type, and rebalance status for all disk groups.",
+                "prompt_template": "Show ASM disk group usage. Include total/free/used space, redundancy type, and rebalance status for all disk groups.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Disk Group, Total (TB), Used (TB), Free (TB), % Used, Redundancy, Rebalance Status\n2. ANALYSIS: Utilization distribution, imbalanced groups, capacity trending\n3. KEY FINDINGS: Groups at risk of running out of space\n4. RECOMMENDATIONS: Disk addition or data redistribution actions",
                 "parameters": [],
                 "default_values": {},
                 "expected_output": "ASM disk group summary with usage bars",
@@ -625,7 +625,7 @@ class PromptService:
                 "category": "DBA_CAPACITY",
                 "title": "Temp Space Usage",
                 "description": "Monitor temporary tablespace usage and identify heavy temp consumers.",
-                "prompt_template": "Show current TEMP tablespace usage. List the top {count} sessions consuming temp space with their SQL and sort usage.",
+                "prompt_template": "Show current TEMP tablespace usage. List the top {count} sessions consuming temp space with their SQL and sort usage.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. TEMP OVERVIEW: Total TEMP size, current usage %, peak usage\n2. DATA TABLE: Rank, Session ID, Username, SQL ID, Temp Used (MB), Sort Used (MB), SQL Text (truncated)\n3. KEY FINDINGS: Heavy consumers, temp space pressure patterns\n4. RECOMMENDATIONS: Query optimization or TEMP resize suggestions",
                 "parameters": [
                     {"name": "count", "type": "integer", "description": "Top N sessions", "required": True, "default": 10}
                 ],
@@ -644,7 +644,7 @@ class PromptService:
                 "category": "DBA_SECURITY",
                 "title": "Blocking Session Analysis",
                 "description": "Identify blocking sessions and their wait chains to resolve lock contention.",
-                "prompt_template": "Show all current blocking sessions. Include blocker/waiter chain, blocked SQL, lock type, and how long each session has been blocked.",
+                "prompt_template": "Show all current blocking sessions. Include blocker/waiter chain, blocked SQL, lock type, and how long each session has been blocked.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. BLOCKING TREE: Visual representation of blocker → waiter chains\n2. DATA TABLE: Blocker SID, Waiter SID, Lock Type, Object, Wait Duration, Blocked SQL\n3. KEY FINDINGS: Root blocker sessions, impact scope, recurring patterns\n4. RECOMMENDATIONS: Resolution steps and prevention measures",
                 "parameters": [],
                 "default_values": {},
                 "expected_output": "Blocking tree with session details and wait durations",
@@ -657,7 +657,7 @@ class PromptService:
                 "category": "DBA_SECURITY",
                 "title": "Long Running Sessions",
                 "description": "Find sessions running longer than a threshold with resource consumption details.",
-                "prompt_template": "List all sessions running longer than {minutes} minutes. Include SQL text, elapsed time, CPU usage, and undo/temp consumption.",
+                "prompt_template": "List all sessions running longer than {minutes} minutes. Include SQL text, elapsed time, CPU usage, and undo/temp consumption.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: SID, Username, SQL ID, Elapsed Time (min), CPU (s), Undo (MB), Temp (MB), Status, SQL Text\n2. ANALYSIS: Session patterns, resource consumption trends\n3. KEY FINDINGS: Sessions posing risk to system stability\n4. RECOMMENDATIONS: Which sessions to monitor, kill, or optimize",
                 "parameters": [
                     {"name": "minutes", "type": "integer", "description": "Minimum runtime in minutes", "required": True, "default": 30}
                 ],
@@ -689,7 +689,7 @@ class PromptService:
                 "category": "DBA_SECURITY",
                 "title": "User Privilege Audit",
                 "description": "Audit database user privileges and identify excessive permissions.",
-                "prompt_template": "Audit privileges for user {username}. Show system privileges, object privileges, roles, and flag any excessive permissions compared to least-privilege principles.",
+                "prompt_template": "Audit privileges for user {username}. Show system privileges, object privileges, roles, and flag any excessive permissions compared to least-privilege principles.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. SYSTEM PRIVILEGES TABLE: Privilege, Admin Option, Risk Level (Low/Medium/High)\n2. ROLES TABLE: Role Name, Privileges Count, Admin Option\n3. OBJECT PRIVILEGES TABLE: Object, Privilege, Grantor\n4. RISK ASSESSMENT: Excessive permissions flagged with explanations\n5. RECOMMENDATIONS: Privileges to revoke, roles to consolidate",
                 "parameters": [
                     {"name": "username", "type": "string", "description": "Database username", "required": True, "default": "SYSTEM"}
                 ],
@@ -708,7 +708,7 @@ class PromptService:
                 "category": "DBA_BACKUP",
                 "title": "RMAN Backup Status",
                 "description": "Show recent RMAN backup status including completion, duration, and failures.",
-                "prompt_template": "Show RMAN backup status for the last {days} days. Include backup type, status, duration, size, and any failures with error codes.",
+                "prompt_template": "Show RMAN backup status for the last {days} days. Include backup type, status, duration, size, and any failures with error codes.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Date, Backup Type, Status, Duration (min), Size (GB), Error Code\n2. SUMMARY: Success rate %, total backup size, average duration\n3. KEY FINDINGS: Failed backups, performance trends, anomalies\n4. RECOMMENDATIONS: Backup schedule optimization and failure remediation",
                 "parameters": [
                     {"name": "days", "type": "integer", "description": "Lookback in days", "required": True, "default": 7}
                 ],
@@ -723,7 +723,7 @@ class PromptService:
                 "category": "DBA_BACKUP",
                 "title": "Archive Log Generation Rate",
                 "description": "Monitor archive log generation rate and predict storage requirements.",
-                "prompt_template": "Show archive log generation rate for the last {days} days. Include hourly rates, daily totals, and storage consumption. Project when the FRA will reach {threshold}% full.",
+                "prompt_template": "Show archive log generation rate for the last {days} days. Include hourly rates, daily totals, and storage consumption. Project when the FRA will reach {threshold}% full.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Date, Hourly Avg Rate (MB/hr), Daily Total (GB), Peak Hour, Peak Rate (MB/hr)\n2. FRA PROJECTION: Current usage, growth trend, projected full date\n3. KEY FINDINGS: Unusual generation spikes, correlation with workload\n4. RECOMMENDATIONS: FRA sizing, archivelog management, backup frequency",
                 "parameters": [
                     {"name": "days", "type": "integer", "description": "Analysis period in days", "required": True, "default": 7},
                     {"name": "threshold", "type": "integer", "description": "FRA alert threshold %", "required": True, "default": 80}
@@ -739,7 +739,7 @@ class PromptService:
                 "category": "DBA_BACKUP",
                 "title": "Recovery Point Objective Check",
                 "description": "Verify the current RPO against backup policies and identify gaps.",
-                "prompt_template": "Check recovery point objective (RPO). Show the most recent backup per backup type, calculate current RPO, and compare with target RPO of {target_minutes} minutes.",
+                "prompt_template": "Check recovery point objective (RPO). Show the most recent backup per backup type, calculate current RPO, and compare with target RPO of {target_minutes} minutes.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. DATA TABLE: Backup Type, Last Backup Time, Age (hours), Status, RPO Met (Yes/No)\n2. RPO COMPLIANCE: Current RPO vs target, compliance percentage\n3. KEY FINDINGS: Gaps in backup coverage, at-risk periods\n4. RECOMMENDATIONS: Backup schedule adjustments to meet RPO targets",
                 "parameters": [
                     {"name": "target_minutes", "type": "integer", "description": "Target RPO in minutes", "required": True, "default": 60}
                 ],
@@ -754,7 +754,7 @@ class PromptService:
                 "category": "DBA_BACKUP",
                 "title": "Flash Recovery Area Usage",
                 "description": "Monitor FRA usage, components, and projected fill rate.",
-                "prompt_template": "Show Flash Recovery Area status. Include total/used/free space, component breakdown (archivelogs, backups, flashback logs), and space reclaimable.",
+                "prompt_template": "Show Flash Recovery Area status. Include total/used/free space, component breakdown (archivelogs, backups, flashback logs), and space reclaimable.\n\nIMPORTANT: Use your database tools to query real data from the Oracle database. Present the results in a structured format.\n\nProvide a structured analysis:\n1. FRA OVERVIEW TABLE: Total Size (GB), Used (GB), Free (GB), % Used, Reclaimable (GB)\n2. COMPONENT BREAKDOWN: Component Type, Size (GB), % of Total, Files Count\n3. KEY FINDINGS: Components consuming most space, reclaimable opportunities\n4. RECOMMENDATIONS: Space management actions and FRA maintenance",
                 "parameters": [],
                 "default_values": {},
                 "expected_output": "FRA usage breakdown with component sizes",

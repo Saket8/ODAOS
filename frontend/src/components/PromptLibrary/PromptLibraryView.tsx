@@ -8,9 +8,12 @@ import {
     ChevronLeft,
     LogOut,
     Loader2,
+    Sun,
+    Moon,
 } from 'lucide-react'
 import { usePromptStore } from '../../stores/promptStore'
 import { useAuthStore } from '../../stores/authStore'
+import { useTheme } from '../../hooks/useTheme'
 import PromptCard from './PromptCard'
 import PromptDetailModal from './PromptDetailModal'
 import { useNavigate } from 'react-router-dom'
@@ -21,6 +24,7 @@ function capitalize(s: string): string {
 
 export default function PromptLibraryView() {
     const navigate = useNavigate()
+    const { darkMode, toggleTheme } = useTheme()
     const { username, logout } = useAuthStore()
     const {
         prompts,
@@ -85,7 +89,7 @@ export default function PromptLibraryView() {
     return (
         <div className="flex h-full bg-[var(--bg-primary)]">
             {/* Left nav */}
-            <div className="w-52 flex-shrink-0 border-r border-[var(--border-subtle)] bg-[var(--bg-sidebar)] flex flex-col">
+            <div className="w-48 flex-shrink-0 border-r border-[var(--border-subtle)] bg-[var(--bg-sidebar)] flex flex-col">
                 {/* Back */}
                 <div className="p-3">
                     <button
@@ -180,10 +184,17 @@ export default function PromptLibraryView() {
                     </div>
                 )}
 
-                {/* User */}
-                <div className="p-3 mt-auto border-t border-[var(--border-subtle)]">
-                    <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                        <span className="truncate">{username}</span>
+                {/* User + theme */}
+                <div className="p-3 mt-auto border-t border-[var(--border-subtle)] space-y-2">
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={toggleTheme}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
+                            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                        >
+                            {darkMode ? <Sun size={12} /> : <Moon size={12} />}
+                            {darkMode ? 'Light' : 'Dark'}
+                        </button>
                         <button
                             onClick={handleLogout}
                             className="p-1 rounded hover:bg-[var(--bg-hover)] hover:text-red-400 transition-colors"
@@ -191,6 +202,9 @@ export default function PromptLibraryView() {
                         >
                             <LogOut size={12} />
                         </button>
+                    </div>
+                    <div className="text-[11px] text-[var(--text-muted)] truncate">
+                        {username}
                     </div>
                 </div>
             </div>

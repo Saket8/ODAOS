@@ -1,0 +1,26 @@
+[
+  {
+    "id": "brm-revenue-001",
+    "cat": "BRM_REVENUE",
+    "title": "Monthly Revenue Trend",
+    "template": "Show the monthly revenue trend for the last {months} months. Include month-over-month growth percentages and highlight any significant changes.\n\nProvide a structured analysis:\n1. DATA TABLE: Present the data in a markdown table with columns: Month, Revenue, MoM Growth %, Trend\n2. TREND ANALYSIS: Describe overall direction, seasonality patterns, and growth/decline periods\n3. KEY INSIGHTS: List 3-5 bullet points highlighting notable findings\n4. RECOMMENDATIONS: Suggest 2-3 actionable items based on the trends"
+  },
+  {
+    "id": "brm-revenue-003",
+    "cat": "BRM_REVENUE",
+    "title": "Top Revenue Generating Accounts",
+    "template": "List the top {count} revenue-generating accounts. Show their total revenue, product mix, and growth trend for the last {months} months.\n\nProvide a structured analysis:\n1. DATA TABLE: Rank, Account, Total Revenue, Primary Products, Growth Rate\n2. CONCENTRATION ANALYSIS: Revenue concentration risk (top 5, top 10 share)\n3. KEY INSIGHTS: Account-level patterns and risks\n4. RECOMMENDATIONS: Retention strategies for top accounts"
+  },
+  {
+    "id": "brm-customer-003",
+    "cat": "BRM_CUSTOMER",
+    "title": "New Customer Acquisition Trend",
+    "template": "Show new customer acquisitions over the last {months} months. Break down by acquisition channel and compare with targets.\n\nProvide a structured analysis:\n1. DATA TABLE: Month, New Customers, Channel Breakdown, vs Target %\n2. CHANNEL ANALYSIS: Cost per acquisition and conversion rates by channel\n3. KEY INSIGHTS: Most effective channels and seasonal patterns\n4. RECOMMENDATIONS: Budget allocation adjustments"
+  },
+  {
+    "id": "brm-payment-002",
+    "cat": "BRM_PAYMENT",
+    "title": "Payment Method Distribution",
+    "template": "Show payment method distribution for the last {months} months. Include volume, value, success rate, and failure reasons per method.\n\nProvide a structured analysis:\n1. DATA TABLE: Method, Volume, Total Value, Success Rate %, Top Failure Reason\n2. TREND ANALYSIS: Shifts in payment method preference over time\n3. KEY INSIGHTS: Methods with low success rates requiring attention\n4. RECOMMENDATIONS: Steps to improve success rates and encourage preferred methods"
+  }
+]

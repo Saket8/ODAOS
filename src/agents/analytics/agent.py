@@ -437,6 +437,18 @@ class AnalyticsAgent:
         - 'churn_region' (geographic risk)
         - 'arpu_churn' (correlation between revenue and risk)
         - 'complaints' (service issues)
+        - 'top_accounts' (highest revenue customers)
+        - 'revenue_leakage' (unbilled usage, leakage)
+        - 'customer_churn' (churn rate trends)
+        - 'acquisition_trend' (new signups, acquisition)
+        - 'customer_segments' (segmentation by arpu/tenure)
+        - 'overdue_payments' (aging buckets, overdue)
+        - 'payment_methods' (credit card, channels)
+        - 'failed_payments' (payment failures)
+        - 'payment_recon' (reconciliation, matched)
+        - 'bill_cycle' (billing cycle success)
+        - 'provisioning_queue' (service orders, provisioning)
+        - 'rating_performance' (throughput, latency)
 
         Available chart_types: 'pie', 'bar', 'line', 'scatter', 'heatmap', 'auto'.
 
@@ -496,6 +508,19 @@ class AnalyticsAgent:
     def _detect_data_type(self, query: str) -> str:
         """Fallback keyword-based data type detection."""
         q = query.lower()
+        if any(word in q for word in ["payment method", "channel"]): return "payment_methods"
+        if any(word in q for word in ["overdue payment", "aging"]): return "overdue_payments"
+        if any(word in q for word in ["failed payment", "root cause"]): return "failed_payments"
+        if any(word in q for word in ["reconciliation", "unmatched"]): return "payment_recon"
+        if any(word in q for word in ["leakage", "unbilled"]): return "revenue_leakage"
+        if any(word in q for word in ["top", "highest revenue"]): return "top_accounts"
+        if any(word in q for word in ["acquisition", "new customer"]): return "acquisition_trend"
+        if any(word in q for word in ["segmentation", "tenure"]): return "customer_segments"
+        if any(word in q for word in ["bill cycle", "success rate", "errors"]): return "bill_cycle"
+        if any(word in q for word in ["provisioning", "queue"]): return "provisioning_queue"
+        if any(word in q for word in ["rating engine", "throughput"]): return "rating_performance"
+        if any(word in q for word in ["customer churn analysis", "churn rate trend"]): return "customer_churn"
+        
         if any(word in q for word in ["customer", "region", "country", "distribution"]): return "customer_region"
         if any(word in q for word in ["revenue trend", "growth", "monthly"]): return "revenue_trends"
         if any(word in q for word in ["revenue by service", "service revenue"]): return "revenue_service"
@@ -506,7 +531,7 @@ class AnalyticsAgent:
             return "churn_region"
         if any(word in q for word in ["arpu", "scatter"]): return "arpu_churn"
         if any(word in q for word in ["complaint", "adjustment", "error", "issue"]): return "complaints"
-        return "customer_region"
+        return "revenue_trends"
 
     def _detect_chart_type(self, query: str, preferred: str) -> str:
         """Fallback keyword-based chart type detection."""

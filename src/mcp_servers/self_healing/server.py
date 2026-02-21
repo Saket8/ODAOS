@@ -431,6 +431,77 @@ async def list_tools() -> list[Tool]:
                 "required": ["sid", "serial"],
             },
         ),
+        Tool(
+            name="get_long_running_sessions",
+            description="Find long running user sessions in the database that exceed a specified execution threshold.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "minutes_threshold": {
+                        "type": "integer",
+                        "description": "Minimum active minutes to be considered long running",
+                        "default": 60,
+                        "minimum": 1,
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_user_privileges",
+            description="Audit and retrieve all system privileges and roles granted to a specific database user.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "username": {
+                        "type": "string",
+                        "description": "Database username to audit",
+                    },
+                },
+                "required": ["username"],
+            },
+        ),
+        Tool(
+            name="get_rman_backup_status",
+            description="Check the status of recent RMAN database backup jobs, including success/failure rates and elapsed times.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days to look back for backup jobs",
+                        "default": 7,
+                        "minimum": 1,
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_archive_log_rate",
+            description="Analyze the daily generation rate of archive logs in GB to identify abnormal redo generation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days of history to analyze",
+                        "default": 7,
+                        "minimum": 1,
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_flash_recovery_area",
+            description="Check the Flash Recovery Area (FRA) space usage, limits, and component breakdown.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
     ]
 
 
@@ -456,6 +527,20 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             serial = arguments.get("serial")
             immediate = arguments.get("immediate", False)
             result = await kill_session_handler(sid, serial, immediate)
+        elif name == "get_long_running_sessions":
+            minutes = arguments.get("minutes_threshold", 60)
+            result = await get_long_running_sessions_handler(minutes)
+        elif name == "get_user_privileges":
+            username = arguments.get("username")
+            result = await get_user_privileges_handler(username)
+        elif name == "get_rman_backup_status":
+            days = arguments.get("days", 7)
+            result = await get_rman_backup_status_handler(days)
+        elif name == "get_archive_log_rate":
+            days = arguments.get("days", 7)
+            result = await get_archive_log_rate_handler(days)
+        elif name == "get_flash_recovery_area":
+            result = await get_flash_recovery_area_handler()
         else:
             result = {"error": f"Unknown tool: {name}"}
         
@@ -718,6 +803,394 @@ async def kill_session_handler(sid: int, serial: int, immediate: bool = False) -
         return {"error": "sid and serial are required"}
     
     return generate_kill_session_command(sid, serial, immediate)
+
+
+# ============================================================================
+# New Tool Handlers — Phase 2 (covering all DBA prompts)
+# ============================================================================
+
+async def get_long_running_sessions_handler(minutes_threshold: int = 60) -> dict:
+    """Find long running sessions.
+    
+    Queries V$SESSION for currently executing sessions where LAST_CALL_ET 
+    exceeds the given threshold.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_long_running_sessions(minutes_threshold)
+        
+        await manager.initialize()
+        
+        sessions_result = []
+        try:
+            query = """
+            SELECT 
+                sid,
+                serial#,
+                username,
+                status,
+                machine,
+                program,
+                sql_id,
+                ROUND(last_call_et / 60, 2) as active_mins,
+                event
+            FROM V$SESSION
+            WHERE type = 'USER'
+              AND status = 'ACTIVE'
+              AND last_call_et > :thresh * 60
+            ORDER BY last_call_et DESC
+            """
+            sessions_result = await manager.execute_query(query.replace(':thresh', str(minutes_threshold)))
+        except Exception as e:
+            logger.warning(f"Long running sessions query failed: {e}")
+        
+        sessions = []
+        for r in sessions_result:
+            sessions.append({
+                "sid": int(r.get('SID', 0)),
+                "serial": int(r.get('SERIAL#', 0)),
+                "username": r.get('USERNAME', 'Unknown'),
+                "status": r.get('STATUS', 'Unknown'),
+                "machine": r.get('MACHINE', 'Unknown'),
+                "program": r.get('PROGRAM', 'Unknown'),
+                "sql_id": r.get('SQL_ID', 'Unknown'),
+                "active_mins": float(r.get('ACTIVE_MINS', 0)),
+                "wait_event": r.get('EVENT', 'Unknown'),
+            })
+            
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "threshold_minutes": minutes_threshold,
+            "count": len(sessions),
+            "sessions": sessions,
+        }
+    except Exception as e:
+        logger.warning(f"Long running sessions query failed, using mock: {e}")
+        return _mock_long_running_sessions(minutes_threshold)
+
+
+def _mock_long_running_sessions(minutes: int) -> dict:
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "threshold_minutes": minutes,
+        "count": 2,
+        "sessions": [
+            {"sid": 133, "serial": 451, "username": "BATCH_USER", "status": "ACTIVE", "machine": "batch-srv", "program": "sqlplus@batch", "sql_id": "8ajxj29j", "active_mins": 125.4, "wait_event": "db file scattered read"},
+            {"sid": 218, "serial": 991, "username": "APP_USER", "status": "ACTIVE", "machine": "app-srv", "program": "JDBC", "sql_id": "1m2xzz9p", "active_mins": 82.1, "wait_event": "enq: TX - row lock contention"},
+        ]
+    }
+
+
+async def get_user_privileges_handler(username: str) -> dict:
+    """Get system and role privileges for a specific user.
+    
+    Queries DBA_SYS_PRIVS and DBA_ROLE_PRIVS.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_user_privileges(username)
+            
+        await manager.initialize()
+        
+        sys_privs = []
+        try:
+            sys_query = f"""
+            SELECT privilege, admin_option
+            FROM DBA_SYS_PRIVS
+            WHERE grantee = UPPER('{username}')
+            ORDER BY privilege
+            """
+            sys_result = await manager.execute_query(sys_query)
+            sys_privs = [{"privilege": r.get("PRIVILEGE"), "admin_option": r.get("ADMIN_OPTION") == "YES"} for r in sys_result]
+        except Exception as e:
+            logger.warning(f"Sys privs query failed: {e}")
+            
+        role_privs = []
+        try:
+            role_query = f"""
+            SELECT granted_role, admin_option, default_role
+            FROM DBA_ROLE_PRIVS
+            WHERE grantee = UPPER('{username}')
+            ORDER BY granted_role
+            """
+            role_result = await manager.execute_query(role_query)
+            role_privs = [{"role": r.get("GRANTED_ROLE"), "admin_option": r.get("ADMIN_OPTION") == "YES", "default_role": r.get("DEFAULT_ROLE") == "YES"} for r in role_result]
+        except Exception as e:
+            logger.warning(f"Role privs query failed: {e}")
+            
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "username": username.upper(),
+            "system_privileges": sys_privs,
+            "roles": role_privs,
+        }
+    except Exception as e:
+        logger.warning(f"Privileges query failed, using mock: {e}")
+        return _mock_user_privileges(username)
+
+
+def _mock_user_privileges(username: str) -> dict:
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "username": username.upper(),
+        "system_privileges": [
+            {"privilege": "CREATE SESSION", "admin_option": False},
+            {"privilege": "CREATE TABLE", "admin_option": False},
+        ],
+        "roles": [
+            {"role": "CONNECT", "admin_option": False, "default_role": True},
+            {"role": "RESOURCE", "admin_option": False, "default_role": True},
+        ]
+    }
+
+
+async def get_rman_backup_status_handler(days: int = 7) -> dict:
+    """Get recent RMAN backup job status.
+    
+    Queries V$RMAN_BACKUP_JOB_DETAILS.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_rman_backup()
+            
+        await manager.initialize()
+        
+        backups = []
+        try:
+            query = """
+            SELECT 
+                session_key,
+                input_type,
+                status,
+                TO_CHAR(start_time, 'YYYY-MM-DD HH24:MI:SS') as start_time,
+                TO_CHAR(end_time, 'YYYY-MM-DD HH24:MI:SS') as end_time,
+                ROUND(elapsed_seconds/60, 2) as elapsed_mins,
+                ROUND(input_bytes/1024/1024/1024, 2) as input_gb,
+                ROUND(output_bytes/1024/1024/1024, 2) as output_gb
+            FROM V$RMAN_BACKUP_JOB_DETAILS
+            WHERE start_time > SYSDATE - :days
+            ORDER BY start_time DESC
+            """
+            result = await manager.execute_query(query.replace(':days', str(days)))
+            for r in result:
+                backups.append({
+                    "session_key": int(r.get("SESSION_KEY", 0)),
+                    "type": r.get("INPUT_TYPE", "Unknown"),
+                    "status": r.get("STATUS", "Unknown"),
+                    "start_time": r.get("START_TIME", ""),
+                    "end_time": r.get("END_TIME", ""),
+                    "elapsed_mins": float(r.get("ELAPSED_MINS", 0)),
+                    "input_gb": float(r.get("INPUT_GB", 0)),
+                    "output_gb": float(r.get("OUTPUT_GB", 0)),
+                })
+        except Exception as e:
+            logger.warning(f"RMAN query failed: {e}")
+            
+        failed_jobs = [b for b in backups if "FAILED" in b["status"].upper() or "WITH ERROR" in b["status"].upper()]
+            
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "days_analyzed": days,
+            "summary": {
+                "total_jobs": len(backups),
+                "failed_jobs": len(failed_jobs),
+                "success_rate": round(((len(backups) - len(failed_jobs)) / max(len(backups), 1)) * 100, 2)
+            },
+            "recent_jobs": backups[:10],
+            "failed_jobs": failed_jobs
+        }
+    except Exception as e:
+        logger.warning(f"RMAN query failed, using mock: {e}")
+        return _mock_rman_backup()
+
+
+def _mock_rman_backup() -> dict:
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "days_analyzed": 7,
+        "summary": {"total_jobs": 7, "failed_jobs": 0, "success_rate": 100.0},
+        "recent_jobs": [
+            {"session_key": 99, "type": "DB INCR", "status": "COMPLETED", "start_time": "2025-02-21 02:00:00", "end_time": "2025-02-21 02:45:00", "elapsed_mins": 45.0, "input_gb": 150.5, "output_gb": 45.2},
+            {"session_key": 98, "type": "ARCHIVELOG", "status": "COMPLETED", "start_time": "2025-02-20 14:00:00", "end_time": "2025-02-20 14:05:00", "elapsed_mins": 5.0, "input_gb": 12.1, "output_gb": 12.0}
+        ],
+        "failed_jobs": []
+    }
+
+
+async def get_archive_log_rate_handler(days: int = 7) -> dict:
+    """Analyze archive log generation rate.
+    
+    Queries V$ARCHIVED_LOG to show GB generated per day.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_archive_log_rate()
+            
+        await manager.initialize()
+        
+        daily_rates = []
+        try:
+            query = """
+            SELECT 
+                TO_CHAR(completion_time, 'YYYY-MM-DD') as day,
+                COUNT(*) as log_count,
+                ROUND(SUM(blocks * block_size)/1024/1024/1024, 2) as size_gb
+            FROM V$ARCHIVED_LOG
+            WHERE completion_time >= TRUNC(SYSDATE - :days)
+              AND creator = 'ARCH'
+            GROUP BY TO_CHAR(completion_time, 'YYYY-MM-DD')
+            ORDER BY day DESC
+            """
+            result = await manager.execute_query(query.replace(':days', str(days)))
+            for r in result:
+                daily_rates.append({
+                    "date": r.get("DAY", ""),
+                    "log_count": int(r.get("LOG_COUNT", 0)),
+                    "size_gb": float(r.get("SIZE_GB", 0)),
+                })
+        except Exception as e:
+            logger.warning(f"Archive log query failed: {e}")
+            
+        total_gb = sum(r["size_gb"] for r in daily_rates)
+        avg_gb = round(total_gb / max(len(daily_rates), 1), 2)
+            
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "days_analyzed": days,
+            "summary": {
+                "total_gb": round(total_gb, 2),
+                "avg_gb_per_day": avg_gb,
+                "max_gb_day": max(daily_rates, key=lambda x: x["size_gb"]) if daily_rates else None
+            },
+            "daily_generation": daily_rates
+        }
+    except Exception as e:
+        logger.warning(f"Archive log query failed, using mock: {e}")
+        return _mock_archive_log_rate()
+
+
+def _mock_archive_log_rate() -> dict:
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "days_analyzed": 3,
+        "summary": {"total_gb": 150.5, "avg_gb_per_day": 50.16, "max_gb_day": {"date": "2025-02-21", "size_gb": 65.2}},
+        "daily_generation": [
+            {"date": "2025-02-21", "log_count": 45, "size_gb": 65.2},
+            {"date": "2025-02-20", "log_count": 32, "size_gb": 42.1},
+            {"date": "2025-02-19", "log_count": 35, "size_gb": 43.2}
+        ]
+    }
+
+
+async def get_flash_recovery_area_handler() -> dict:
+    """Get Flash Recovery Area (FRA) usage and limits.
+    
+    Queries V$RECOVERY_FILE_DEST and V$FLASH_RECOVERY_AREA_USAGE.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_fra_usage()
+            
+        await manager.initialize()
+        
+        fra_info = {}
+        try:
+            query1 = """
+            SELECT 
+                name,
+                ROUND(space_limit/1024/1024/1024, 2) as limit_gb,
+                ROUND(space_used/1024/1024/1024, 2) as used_gb,
+                ROUND(space_reclaimable/1024/1024/1024, 2) as reclaimable_gb,
+                ROUND((space_used - space_reclaimable)/NULLIF(space_limit,0)*100, 2) as pct_used
+            FROM V$RECOVERY_FILE_DEST
+            """
+            res = await manager.execute_query(query1)
+            if res:
+                r = res[0]
+                fra_info = {
+                    "location": r.get("NAME", ""),
+                    "limit_gb": float(r.get("LIMIT_GB", 0)),
+                    "used_gb": float(r.get("USED_GB", 0)),
+                    "reclaimable_gb": float(r.get("RECLAIMABLE_GB", 0)),
+                    "pct_used": float(r.get("PCT_USED", 0)),
+                }
+        except Exception as e:
+            logger.warning(f"FRA dest query failed: {e}")
+            
+        components = []
+        try:
+            query2 = """
+            SELECT 
+                file_type,
+                percent_space_used,
+                percent_space_reclaimable,
+                number_of_files
+            FROM V$FLASH_RECOVERY_AREA_USAGE
+            WHERE percent_space_used > 0
+            """
+            res2 = await manager.execute_query(query2)
+            for r in res2:
+                components.append({
+                    "file_type": r.get("FILE_TYPE", ""),
+                    "pct_used": float(r.get("PERCENT_SPACE_USED", 0)),
+                    "pct_reclaimable": float(r.get("PERCENT_SPACE_RECLAIMABLE", 0)),
+                    "files": int(r.get("NUMBER_OF_FILES", 0))
+                })
+        except Exception as e:
+            logger.warning(f"FRA usage query failed: {e}")
+            
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "fra_summary": fra_info,
+            "components": components,
+            "status": "CRITICAL" if fra_info.get("pct_used", 0) > 90 else "WARNING" if fra_info.get("pct_used", 0) > 80 else "OK"
+        }
+    except Exception as e:
+        logger.warning(f"FRA query failed, using mock: {e}")
+        return _mock_fra_usage()
+
+
+def _mock_fra_usage() -> dict:
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "fra_summary": {
+            "location": "+RECO",
+            "limit_gb": 1024.0,
+            "used_gb": 850.5,
+            "reclaimable_gb": 100.0,
+            "pct_used": 73.29
+        },
+        "components": [
+            {"file_type": "ARCHIVED LOG", "pct_used": 45.2, "pct_reclaimable": 10.5, "files": 120},
+            {"file_type": "BACKUP PIECE", "pct_used": 35.5, "pct_reclaimable": 0.0, "files": 8}
+        ],
+        "status": "OK"
+    }
 
 
 # ============================================================================

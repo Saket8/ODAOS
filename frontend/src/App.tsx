@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { Moon, Sun, PanelLeft, Settings, X, BookOpen } from 'lucide-react'
@@ -6,22 +6,15 @@ import ChatContainer from './components/Chat/ChatContainer'
 import Sidebar from './components/Layout/Sidebar'
 import LoginGate from './components/PromptLibrary/LoginGate'
 import PromptLibraryView from './components/PromptLibrary/PromptLibraryView'
+import { useTheme } from './hooks/useTheme'
 
 function AppShell() {
-  const [darkMode, setDarkMode] = useState(true)
+  const { darkMode, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [darkMode])
 
   // If on prompt library route, render the prompt library view
   if (location.pathname.startsWith('/prompt-library')) {
@@ -82,7 +75,7 @@ function AppShell() {
                 <BookOpen size={16} className="text-[var(--text-secondary)] group-hover:text-[var(--accent-primary)]" />
               </button>
               <button
-                onClick={() => setDarkMode(!darkMode)}
+                onClick={() => toggleTheme()}
                 className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                 title={darkMode ? 'Light mode' : 'Dark mode'}
               >
@@ -138,7 +131,7 @@ function AppShell() {
                 <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)]">
                   <span className="text-sm font-medium">Dark Mode</span>
                   <button
-                    onClick={() => setDarkMode(!darkMode)}
+                    onClick={() => toggleTheme()}
                     className={`w-10 h-5 rounded-full transition-colors relative ${darkMode ? 'bg-[var(--accent-success)]' : 'bg-[var(--bg-tertiary)]'
                       }`}
                   >

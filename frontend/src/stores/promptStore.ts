@@ -87,6 +87,7 @@ interface PromptLibraryState {
     isLoading: boolean
     isExecuting: boolean
     executionOutput: string
+    executionChartData: any | null
     error: string | null
     view: 'grid' | 'list'
 
@@ -98,7 +99,7 @@ interface PromptLibraryState {
     selectPrompt: (id: string) => Promise<void>
     clearSelectedPrompt: () => void
     toggleFavorite: (promptId: string) => Promise<void>
-    executePrompt: (promptId: string, parameters: Record<string, any>, sessionId?: string) => Promise<void>
+    executePrompt: (promptId: string, parameters: Record<string, any>, sessionId?: string, customQuery?: string) => Promise<void>
     setCategory: (category: string | null) => void
     setSearch: (query: string) => void
     setDifficulty: (difficulty: string | null) => void
@@ -133,6 +134,7 @@ export const usePromptStore = create<PromptLibraryState>((set, get) => ({
     isLoading: false,
     isExecuting: false,
     executionOutput: '',
+    executionChartData: null,
     error: null,
     view: 'grid',
 
@@ -227,7 +229,7 @@ export const usePromptStore = create<PromptLibraryState>((set, get) => ({
         }
     },
 
-    clearSelectedPrompt: () => set({ selectedPrompt: null, executionOutput: '' }),
+    clearSelectedPrompt: () => set({ selectedPrompt: null, executionOutput: '', executionChartData: null }),
 
     // ========================================================================
     // Favorites
@@ -264,8 +266,8 @@ export const usePromptStore = create<PromptLibraryState>((set, get) => ({
     // Execution
     // ========================================================================
 
-    executePrompt: async (promptId: string, parameters: Record<string, any>, sessionId?: string) => {
-        set({ isExecuting: true, executionOutput: '', error: null })
+    executePrompt: async (promptId: string, parameters: Record<string, any>, sessionId?: string, customQuery?: string) => {
+        set({ isExecuting: true, executionOutput: '', executionChartData: null, error: null })
 
         try {
             const response = await fetch(`${API_BASE}/api/prompts/${promptId}/execute`, {
@@ -274,7 +276,11 @@ export const usePromptStore = create<PromptLibraryState>((set, get) => ({
                     ...getHeaders(),
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ parameters, session_id: sessionId }),
+                body: JSON.stringify({
+                    parameters,
+                    session_id: sessionId,
+                    ...(customQuery ? { custom_query: customQuery } : {}),
+                }),
             })
 
             if (!response.ok) {
@@ -313,6 +319,9 @@ export const usePromptStore = create<PromptLibraryState>((set, get) => ({
                             if (event.type === 'error') {
                                 set({ isExecuting: false, error: event.message })
                                 return
+                            }
+                            if (event.type === 'chart' && event.data) {
+                                set({ executionChartData: event.data })
                             }
                         } catch {
                             // Skip malformed events

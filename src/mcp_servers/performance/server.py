@@ -255,6 +255,82 @@ async def list_tools() -> list[Tool]:
                 "required": [],
             },
         ),
+        Tool(
+            name="get_ash_data",
+            description="Get Active Session History (ASH) data including top wait events, top SQL statements consuming database time, and session activity breakdown over a recent time window.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "minutes": {
+                        "type": "integer",
+                        "description": "Number of minutes to look back (default 30)",
+                        "default": 30,
+                        "minimum": 1,
+                        "maximum": 1440,
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_io_performance",
+            description="Get I/O performance statistics per datafile, including read/write latency and throughput. Identifies I/O hotspots.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_instance_parameters",
+            description="Get current Oracle instance parameters. Can show all parameters or only those modified from default.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "modified_only": {
+                        "type": "boolean",
+                        "description": "If true, only show parameters with non-default values",
+                        "default": True,
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_database_uptime",
+            description="Get database uptime, startup time, and general availability status.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_segment_sizes",
+            description="Get the largest database segments (tables, indexes, LOBs) to analyze space consumption.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "top_n": {
+                        "type": "integer",
+                        "description": "Number of segments to return",
+                        "default": 20,
+                        "minimum": 5,
+                        "maximum": 100,
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_temp_usage",
+            description="Get TEMP tablespace usage and the sessions consuming the most temporary space.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
     ]
 
 
@@ -273,6 +349,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         elif name == "check_tablespace_usage":
             threshold = arguments.get("threshold", 85)
             result = await check_tablespace_usage_handler(threshold)
+        elif name == "get_ash_data":
+            minutes = arguments.get("minutes", 30)
+            result = await get_ash_data_handler(minutes)
+        elif name == "get_io_performance":
+            result = await get_io_performance_handler()
+        elif name == "get_instance_parameters":
+            modified_only = arguments.get("modified_only", True)
+            result = await get_instance_parameters_handler(modified_only)
+        elif name == "get_database_uptime":
+            result = await get_database_uptime_handler()
+        elif name == "get_segment_sizes":
+            top_n = arguments.get("top_n", 20)
+            result = await get_segment_sizes_handler(top_n)
+        elif name == "get_temp_usage":
+            result = await get_temp_usage_handler()
         else:
             result = {"error": f"Unknown tool: {name}"}
         
@@ -582,6 +673,577 @@ async def check_tablespace_usage_handler(threshold: int = 85) -> dict:
     except Exception as e:
         logger.warning(f"Database connection failed, using mock data: {e}")
         return get_mock_tablespace_usage(threshold)
+
+
+# ============================================================================
+# New Tool Handlers — Phase 2 (covering all DBA prompts)
+# ============================================================================
+
+async def get_ash_data_handler(minutes: int = 30) -> dict:
+    """Get Active Session History data.
+    
+    Queries V$ACTIVE_SESSION_HISTORY for recent session activity,
+    top wait events, and SQL consuming the most DB time.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_ash_data(minutes)
+        
+        await manager.initialize()
+        
+        # Top wait events from ASH
+        wait_result = []
+        try:
+            wait_query = """
+            SELECT 
+                event,
+                wait_class,
+                COUNT(*) as sample_count,
+                COUNT(DISTINCT session_id) as session_count
+            FROM V$ACTIVE_SESSION_HISTORY
+            WHERE sample_time > SYSDATE - :mins/(24*60)
+              AND event IS NOT NULL
+            GROUP BY event, wait_class
+            ORDER BY COUNT(*) DESC
+            FETCH FIRST 10 ROWS ONLY
+            """
+            wait_result = await manager.execute_query(wait_query.replace(':mins', str(minutes)))
+        except Exception as e:
+            logger.warning(f"ASH wait events query failed: {e}")
+        
+        # Top SQL from ASH
+        sql_result = []
+        try:
+            sql_query = """
+            SELECT 
+                sql_id,
+                COUNT(*) as sample_count,
+                COUNT(DISTINCT session_id) as session_count,
+                ROUND(COUNT(*) * 100 / NULLIF((SELECT COUNT(*) FROM V$ACTIVE_SESSION_HISTORY 
+                    WHERE sample_time > SYSDATE - {mins}/(24*60)), 0), 2) as pct_db_time
+            FROM V$ACTIVE_SESSION_HISTORY
+            WHERE sample_time > SYSDATE - {mins}/(24*60)
+              AND sql_id IS NOT NULL
+            GROUP BY sql_id
+            ORDER BY COUNT(*) DESC
+            FETCH FIRST 10 ROWS ONLY
+            """.format(mins=minutes)
+            sql_result = await manager.execute_query(sql_query)
+        except Exception as e:
+            logger.warning(f"ASH top SQL query failed: {e}")
+        
+        # Session activity summary
+        activity_result = []
+        try:
+            activity_query = """
+            SELECT 
+                session_state,
+                COUNT(*) as sample_count
+            FROM V$ACTIVE_SESSION_HISTORY
+            WHERE sample_time > SYSDATE - {mins}/(24*60)
+            GROUP BY session_state
+            """.format(mins=minutes)
+            activity_result = await manager.execute_query(activity_query)
+        except Exception as e:
+            logger.warning(f"ASH activity query failed: {e}")
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "analysis_window_minutes": minutes,
+            "top_wait_events": [
+                {
+                    "event": r.get('EVENT', 'Unknown'),
+                    "wait_class": r.get('WAIT_CLASS', 'Unknown'),
+                    "sample_count": int(r.get('SAMPLE_COUNT', 0)),
+                    "session_count": int(r.get('SESSION_COUNT', 0)),
+                }
+                for r in wait_result
+            ],
+            "top_sql": [
+                {
+                    "sql_id": r.get('SQL_ID', 'Unknown'),
+                    "sample_count": int(r.get('SAMPLE_COUNT', 0)),
+                    "session_count": int(r.get('SESSION_COUNT', 0)),
+                    "pct_db_time": float(r.get('PCT_DB_TIME', 0)),
+                }
+                for r in sql_result
+            ],
+            "session_activity": {
+                r.get('SESSION_STATE', 'Unknown'): int(r.get('SAMPLE_COUNT', 0))
+                for r in activity_result
+            },
+        }
+    except Exception as e:
+        logger.warning(f"ASH query failed, using mock: {e}")
+        return _mock_ash_data(minutes)
+
+
+def _mock_ash_data(minutes: int = 30) -> dict:
+    """Mock ASH data for when DB is not available."""
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "analysis_window_minutes": minutes,
+        "top_wait_events": [
+            {"event": "db file sequential read", "wait_class": "User I/O", "sample_count": 245, "session_count": 8},
+            {"event": "log file sync", "wait_class": "Commit", "sample_count": 120, "session_count": 15},
+            {"event": "buffer busy waits", "wait_class": "Concurrency", "sample_count": 80, "session_count": 5},
+        ],
+        "top_sql": [
+            {"sql_id": "abc123def", "sample_count": 95, "session_count": 3, "pct_db_time": 22.5},
+            {"sql_id": "xyz789ghi", "sample_count": 60, "session_count": 2, "pct_db_time": 14.2},
+        ],
+        "session_activity": {"ON CPU": 350, "WAITING": 480},
+    }
+
+
+async def get_io_performance_handler() -> dict:
+    """Get I/O performance statistics per datafile.
+    
+    Queries V$FILESTAT or V$IOSTAT_FILE for read/write latency and throughput.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_io_performance()
+        
+        await manager.initialize()
+        
+        io_result = []
+        try:
+            io_query = """
+            SELECT 
+                df.name as file_name,
+                fs.phyrds as physical_reads,
+                fs.phywrts as physical_writes,
+                fs.readtim as read_time_cs,
+                fs.writetim as write_time_cs,
+                ROUND(CASE WHEN fs.phyrds > 0 THEN fs.readtim / fs.phyrds * 10 ELSE 0 END, 2) as avg_read_ms,
+                ROUND(CASE WHEN fs.phywrts > 0 THEN fs.writetim / fs.phywrts * 10 ELSE 0 END, 2) as avg_write_ms,
+                fs.phyblkrd as blocks_read,
+                fs.phyblkwrt as blocks_written
+            FROM V$FILESTAT fs
+            JOIN V$DATAFILE df ON fs.file# = df.file#
+            ORDER BY (fs.readtim + fs.writetim) DESC
+            FETCH FIRST 15 ROWS ONLY
+            """
+            io_result = await manager.execute_query(io_query)
+        except Exception as e:
+            logger.warning(f"V$FILESTAT query failed: {e}")
+        
+        files = []
+        total_reads = 0
+        total_writes = 0
+        for r in io_result:
+            reads = int(r.get('PHYSICAL_READS', 0))
+            writes = int(r.get('PHYSICAL_WRITES', 0))
+            total_reads += reads
+            total_writes += writes
+            files.append({
+                "file_name": r.get('FILE_NAME', 'Unknown'),
+                "physical_reads": reads,
+                "physical_writes": writes,
+                "avg_read_ms": float(r.get('AVG_READ_MS', 0)),
+                "avg_write_ms": float(r.get('AVG_WRITE_MS', 0)),
+                "blocks_read": int(r.get('BLOCKS_READ', 0)),
+                "blocks_written": int(r.get('BLOCKS_WRITTEN', 0)),
+            })
+        
+        # Identify hotspots
+        hotspots = [f for f in files if f["avg_read_ms"] > 10 or f["avg_write_ms"] > 10]
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "summary": {
+                "total_files": len(files),
+                "total_physical_reads": total_reads,
+                "total_physical_writes": total_writes,
+                "io_hotspot_count": len(hotspots),
+            },
+            "files": files,
+            "hotspots": hotspots,
+        }
+    except Exception as e:
+        logger.warning(f"I/O performance query failed, using mock: {e}")
+        return _mock_io_performance()
+
+
+def _mock_io_performance() -> dict:
+    """Mock I/O performance data."""
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "summary": {
+            "total_files": 5,
+            "total_physical_reads": 1250000,
+            "total_physical_writes": 340000,
+            "io_hotspot_count": 1,
+        },
+        "files": [
+            {"file_name": "/u01/oradata/users01.dbf", "physical_reads": 500000, "physical_writes": 120000, "avg_read_ms": 4.2, "avg_write_ms": 2.1, "blocks_read": 450000, "blocks_written": 100000},
+            {"file_name": "/u01/oradata/system01.dbf", "physical_reads": 350000, "physical_writes": 80000, "avg_read_ms": 3.8, "avg_write_ms": 1.9, "blocks_read": 300000, "blocks_written": 70000},
+            {"file_name": "/u01/oradata/undotbs01.dbf", "physical_reads": 200000, "physical_writes": 100000, "avg_read_ms": 12.5, "avg_write_ms": 8.3, "blocks_read": 180000, "blocks_written": 90000},
+        ],
+        "hotspots": [
+            {"file_name": "/u01/oradata/undotbs01.dbf", "avg_read_ms": 12.5, "avg_write_ms": 8.3},
+        ],
+    }
+
+
+async def get_instance_parameters_handler(modified_only: bool = True) -> dict:
+    """Get Oracle instance parameters.
+    
+    Queries V$PARAMETER for current parameter values.
+    If modified_only=True, shows only non-default parameters.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_instance_parameters()
+        
+        await manager.initialize()
+        
+        param_result = []
+        try:
+            if modified_only:
+                param_query = """
+                SELECT 
+                    name,
+                    value,
+                    isdefault,
+                    ismodified,
+                    description
+                FROM V$PARAMETER
+                WHERE isdefault = 'FALSE'
+                ORDER BY name
+                """
+            else:
+                param_query = """
+                SELECT 
+                    name,
+                    value,
+                    isdefault,
+                    ismodified,
+                    description
+                FROM V$PARAMETER
+                ORDER BY name
+                FETCH FIRST 50 ROWS ONLY
+                """
+            param_result = await manager.execute_query(param_query)
+        except Exception as e:
+            logger.warning(f"V$PARAMETER query failed: {e}")
+        
+        params = []
+        for r in param_result:
+            params.append({
+                "name": r.get('NAME', 'Unknown'),
+                "value": r.get('VALUE', ''),
+                "is_default": r.get('ISDEFAULT', 'TRUE') == 'TRUE',
+                "is_modified": r.get('ISMODIFIED', 'FALSE') != 'FALSE',
+                "description": r.get('DESCRIPTION', ''),
+            })
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "modified_only": modified_only,
+            "total_parameters": len(params),
+            "parameters": params,
+        }
+    except Exception as e:
+        logger.warning(f"Instance parameters query failed, using mock: {e}")
+        return _mock_instance_parameters()
+
+
+def _mock_instance_parameters() -> dict:
+    """Mock instance parameters."""
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "modified_only": True,
+        "total_parameters": 8,
+        "parameters": [
+            {"name": "db_block_size", "value": "8192", "is_default": False, "is_modified": True, "description": "Size of database block in bytes"},
+            {"name": "memory_target", "value": "4294967296", "is_default": False, "is_modified": True, "description": "Target memory size"},
+            {"name": "open_cursors", "value": "300", "is_default": False, "is_modified": True, "description": "Maximum number of open cursors per session"},
+            {"name": "processes", "value": "500", "is_default": False, "is_modified": True, "description": "Maximum number of OS user processes"},
+            {"name": "sga_target", "value": "2147483648", "is_default": False, "is_modified": True, "description": "Target SGA size"},
+            {"name": "pga_aggregate_target", "value": "1073741824", "is_default": False, "is_modified": True, "description": "Target PGA aggregate size"},
+            {"name": "undo_retention", "value": "900", "is_default": False, "is_modified": True, "description": "Undo retention in seconds"},
+            {"name": "sessions", "value": "772", "is_default": False, "is_modified": True, "description": "Maximum number of sessions"},
+        ],
+    }
+
+
+async def get_database_uptime_handler() -> dict:
+    """Get database uptime and availability information.
+    
+    Queries V$INSTANCE for startup time and calculates uptime.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_database_uptime()
+        
+        await manager.initialize()
+        
+        uptime_result = []
+        try:
+            uptime_query = """
+            SELECT 
+                instance_name,
+                host_name,
+                version,
+                status,
+                database_status,
+                active_state,
+                startup_time,
+                ROUND((SYSDATE - startup_time) * 24, 2) as uptime_hours,
+                ROUND((SYSDATE - startup_time), 2) as uptime_days,
+                logins,
+                archiver,
+                instance_role
+            FROM V$INSTANCE
+            """
+            uptime_result = await manager.execute_query(uptime_query)
+        except Exception as e:
+            logger.warning(f"V$INSTANCE uptime query failed: {e}")
+        
+        if uptime_result:
+            row = uptime_result[0]
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "data_source": "LIVE",
+                "instance_name": row.get('INSTANCE_NAME', 'Unknown'),
+                "host_name": row.get('HOST_NAME', 'Unknown'),
+                "version": row.get('VERSION', 'Unknown'),
+                "status": row.get('STATUS', 'Unknown'),
+                "database_status": row.get('DATABASE_STATUS', 'Unknown'),
+                "active_state": row.get('ACTIVE_STATE', 'Unknown'),
+                "startup_time": str(row.get('STARTUP_TIME', 'Unknown')),
+                "uptime_hours": float(row.get('UPTIME_HOURS', 0)),
+                "uptime_days": float(row.get('UPTIME_DAYS', 0)),
+                "logins": row.get('LOGINS', 'Unknown'),
+                "archiver": row.get('ARCHIVER', 'Unknown'),
+                "instance_role": row.get('INSTANCE_ROLE', 'Unknown'),
+            }
+        
+        return _mock_database_uptime()
+    except Exception as e:
+        logger.warning(f"Uptime query failed, using mock: {e}")
+        return _mock_database_uptime()
+
+
+def _mock_database_uptime() -> dict:
+    """Mock uptime data."""
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "instance_name": "BRMSIT",
+        "host_name": "db-server-01",
+        "version": "19.0.0.0.0",
+        "status": "OPEN",
+        "database_status": "ACTIVE",
+        "active_state": "NORMAL",
+        "startup_time": "2025-01-15 08:00:00",
+        "uptime_hours": 8760.5,
+        "uptime_days": 365.02,
+        "logins": "ALLOWED",
+        "archiver": "STARTED",
+        "instance_role": "PRIMARY_INSTANCE",
+    }
+
+
+async def get_segment_sizes_handler(top_n: int = 20) -> dict:
+    """Get top database segments by size.
+    
+    Queries DBA_SEGMENTS for largest tables, indexes, and LOBs.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_segment_sizes()
+        
+        await manager.initialize()
+        
+        segment_result = []
+        try:
+            segment_query = """
+            SELECT 
+                owner,
+                segment_name,
+                segment_type,
+                tablespace_name,
+                ROUND(bytes/1024/1024, 2) as size_mb,
+                ROUND(bytes/1024/1024/1024, 3) as size_gb,
+                extents
+            FROM DBA_SEGMENTS
+            WHERE owner NOT IN ('SYS', 'SYSTEM', 'DBSNMP', 'OUTLN', 'MDSYS', 'ORDSYS', 'ORDDATA', 'CTXSYS', 'ANONYMOUS', 'EXFSYS', 'DMSYS', 'XDB', 'WMSYS')
+            ORDER BY bytes DESC
+            FETCH FIRST {n} ROWS ONLY
+            """.format(n=top_n)
+            segment_result = await manager.execute_query(segment_query)
+        except Exception as e:
+            logger.warning(f"DBA_SEGMENTS query failed: {e}")
+        
+        segments = []
+        total_size_mb = 0
+        for r in segment_result:
+            size_mb = float(r.get('SIZE_MB', 0))
+            total_size_mb += size_mb
+            segments.append({
+                "owner": r.get('OWNER', 'Unknown'),
+                "segment_name": r.get('SEGMENT_NAME', 'Unknown'),
+                "segment_type": r.get('SEGMENT_TYPE', 'Unknown'),
+                "tablespace_name": r.get('TABLESPACE_NAME', 'Unknown'),
+                "size_mb": size_mb,
+                "size_gb": float(r.get('SIZE_GB', 0)),
+                "extents": int(r.get('EXTENTS', 0)),
+            })
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "top_n": top_n,
+            "total_size_mb": round(total_size_mb, 2),
+            "total_size_gb": round(total_size_mb / 1024, 3),
+            "segments": segments,
+        }
+    except Exception as e:
+        logger.warning(f"Segment sizes query failed, using mock: {e}")
+        return _mock_segment_sizes()
+
+
+def _mock_segment_sizes() -> dict:
+    """Mock segment sizes."""
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "top_n": 20,
+        "total_size_mb": 15360,
+        "total_size_gb": 15.0,
+        "segments": [
+            {"owner": "PIN", "segment_name": "EVENT_BAL_IMPACTS_T", "segment_type": "TABLE", "tablespace_name": "PIN_DATA", "size_mb": 4500, "size_gb": 4.395, "extents": 140},
+            {"owner": "PIN", "segment_name": "EVENT_T", "segment_type": "TABLE", "tablespace_name": "PIN_DATA", "size_mb": 3200, "size_gb": 3.125, "extents": 100},
+            {"owner": "PIN", "segment_name": "ITEM_T", "segment_type": "TABLE", "tablespace_name": "PIN_DATA", "size_mb": 2800, "size_gb": 2.734, "extents": 88},
+            {"owner": "PIN", "segment_name": "IDX_EVENT_CREATED", "segment_type": "INDEX", "tablespace_name": "PIN_INDEX", "size_mb": 1500, "size_gb": 1.465, "extents": 47},
+            {"owner": "PIN", "segment_name": "ACCOUNT_T", "segment_type": "TABLE", "tablespace_name": "PIN_DATA", "size_mb": 1200, "size_gb": 1.172, "extents": 38},
+        ],
+    }
+
+
+async def get_temp_usage_handler() -> dict:
+    """Get TEMP tablespace usage details.
+    
+    Queries V$SORT_SEGMENT and V$TEMP_SPACE_HEADER for temp space consumers.
+    """
+    try:
+        from src.database.connection import get_connection_manager
+        manager = get_connection_manager()
+        
+        if not manager.dsn or not manager.user:
+            return _mock_temp_usage()
+        
+        await manager.initialize()
+        
+        # Overall temp usage
+        temp_overview = []
+        try:
+            temp_query = """
+            SELECT 
+                tablespace_name,
+                ROUND(tablespace_size/1024/1024, 2) as total_mb,
+                ROUND(allocated_space/1024/1024, 2) as allocated_mb,
+                ROUND(free_space/1024/1024, 2) as free_mb,
+                ROUND((allocated_space/NULLIF(tablespace_size,0))*100, 2) as used_pct
+            FROM DBA_TEMP_FREE_SPACE
+            """
+            temp_overview = await manager.execute_query(temp_query)
+        except Exception as e:
+            logger.warning(f"DBA_TEMP_FREE_SPACE query failed: {e}")
+        
+        # Top temp consumers by session
+        temp_consumers = []
+        try:
+            consumer_query = """
+            SELECT 
+                s.sid,
+                s.serial#,
+                s.username,
+                s.program,
+                s.sql_id,
+                ROUND(su.blocks * (SELECT value FROM V$PARAMETER WHERE name = 'db_block_size') / 1024 / 1024, 2) as temp_mb,
+                su.segtype,
+                su.tablespace
+            FROM V$SORT_USAGE su
+            JOIN V$SESSION s ON su.session_addr = s.saddr
+            ORDER BY su.blocks DESC
+            FETCH FIRST 10 ROWS ONLY
+            """
+            temp_consumers = await manager.execute_query(consumer_query)
+        except Exception as e:
+            logger.warning(f"V$SORT_USAGE query failed: {e}")
+        
+        overview = temp_overview[0] if temp_overview else {}
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "data_source": "LIVE",
+            "temp_tablespace": {
+                "name": overview.get('TABLESPACE_NAME', 'TEMP'),
+                "total_mb": float(overview.get('TOTAL_MB', 0)),
+                "allocated_mb": float(overview.get('ALLOCATED_MB', 0)),
+                "free_mb": float(overview.get('FREE_MB', 0)),
+                "used_pct": float(overview.get('USED_PCT', 0)),
+            },
+            "top_consumers": [
+                {
+                    "sid": int(r.get('SID', 0)),
+                    "serial": int(r.get('SERIAL#', 0)),
+                    "username": r.get('USERNAME', 'Unknown'),
+                    "program": r.get('PROGRAM', 'Unknown'),
+                    "sql_id": r.get('SQL_ID', 'Unknown'),
+                    "temp_mb": float(r.get('TEMP_MB', 0)),
+                    "segment_type": r.get('SEGTYPE', 'Unknown'),
+                }
+                for r in temp_consumers
+            ],
+        }
+    except Exception as e:
+        logger.warning(f"Temp usage query failed, using mock: {e}")
+        return _mock_temp_usage()
+
+
+def _mock_temp_usage() -> dict:
+    """Mock temp usage data."""
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": "MOCK",
+        "temp_tablespace": {
+            "name": "TEMP",
+            "total_mb": 4096,
+            "allocated_mb": 2800,
+            "free_mb": 1296,
+            "used_pct": 68.36,
+        },
+        "top_consumers": [
+            {"sid": 145, "serial": 34521, "username": "APP_USER", "program": "java.exe", "sql_id": "abc123", "temp_mb": 850, "segment_type": "SORT"},
+            {"sid": 267, "serial": 45678, "username": "REPORT_USER", "program": "sqlplus", "sql_id": "xyz789", "temp_mb": 620, "segment_type": "HASH"},
+        ],
+    }
 
 
 # ============================================================================

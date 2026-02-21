@@ -18,7 +18,7 @@ export default function PromptCard({
     return (
         <div
             onClick={() => onSelect(prompt.id)}
-            className="group relative p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/60 hover:bg-[var(--bg-secondary)] cursor-pointer transition-all duration-150 hover:border-[var(--border-primary)]"
+            className="group relative p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/60 hover:bg-[var(--bg-secondary)] cursor-pointer transition-all duration-150 hover:border-[var(--border-primary)] flex flex-col"
         >
             {/* Favorite */}
             <button
@@ -26,7 +26,7 @@ export default function PromptCard({
                     e.stopPropagation()
                     toggleFavorite(prompt.id)
                 }}
-                className="absolute top-3 right-3 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-hover)] transition-all"
+                className="absolute top-3.5 right-3.5 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-hover)] transition-all"
             >
                 <Star
                     size={13}
@@ -44,7 +44,7 @@ export default function PromptCard({
             </h3>
 
             {/* Description */}
-            <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed mb-3">
+            <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed mb-3 flex-1">
                 {prompt.description}
             </p>
 
